@@ -1,5 +1,5 @@
 import { Badge, Button } from "@ecommerce-visual-workbench/ui";
-import { ChevronLeft, ShieldCheck } from "lucide-react";
+import { ChevronLeft, ClipboardList, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 import { ProductWorkspace } from "@/components/product-workspace";
@@ -22,6 +22,7 @@ export default async function ProductWorkspacePage({
         <>
           {demo && <Badge className="border-amber-200 bg-amber-50 text-amber-700">演示数据</Badge>}
           <Button variant="secondary" asChild><Link href="/"><ChevronLeft className="h-4 w-4" />返回生产台</Link></Button>
+          <Button variant="secondary" asChild><Link href={`/visual-plans?product=${product.id}`}><ClipboardList className="h-4 w-4" />视觉方案</Link></Button>
           <Button asChild><Link href="/reviews"><ShieldCheck className="h-4 w-4" />打开审核</Link></Button>
         </>
       }

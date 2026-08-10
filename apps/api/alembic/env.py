@@ -7,7 +7,13 @@ from app.core.database import Base
 from sqlalchemy import engine_from_config, pool
 
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+runtime_url = get_settings().database_url
+# Static migration SQL targets the production PostgreSQL contract. The API's
+# SQLite default remains useful for zero-config local tests, but cannot compile
+# PostgreSQL data-migration expressions or constraint changes.
+if context.is_offline_mode() and runtime_url.startswith("sqlite"):
+    runtime_url = config.get_main_option("sqlalchemy.url")
+config.set_main_option("sqlalchemy.url", runtime_url)
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 target_metadata = Base.metadata

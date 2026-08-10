@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { demoAssets, latestVersion, summarizeJobs, type GenerationJob } from "./api";
+import {
+  demoAssets,
+  demoPlatforms,
+  demoRules,
+  demoVisualPlans,
+  latestVersion,
+  summarizeJobs,
+  type GenerationJob,
+} from "./api";
 
 describe("summarizeJobs", () => {
   it("counts every production state", () => {
@@ -24,5 +32,23 @@ describe("latestVersion", () => {
 
     expect(asset).toBeDefined();
     expect(latestVersion(asset!)?.version_number).toBe(2);
+  });
+});
+
+describe("phase two planning fixtures", () => {
+  it("covers all five platform rule frameworks", () => {
+    expect(demoPlatforms.map((platform) => platform.code)).toEqual([
+      "temu",
+      "amazon",
+      "tiktok_shop",
+      "shopee",
+      "aliexpress",
+    ]);
+    expect(new Set(demoRules.map((rule) => rule.platform))).toHaveLength(5);
+  });
+
+  it("keeps requested output quantities on the visual plan", () => {
+    expect(demoVisualPlans[0].requested_outputs).toMatchObject({MAIN: 5, DETAIL: 6, DIMENSION: 2});
+    expect(demoVisualPlans[0].slots.map((slot) => slot.code)).toContain("DIMENSION_FRONT");
   });
 });

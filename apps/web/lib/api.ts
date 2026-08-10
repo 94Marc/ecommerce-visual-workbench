@@ -72,6 +72,49 @@ export type GenerationJob = {
   created_at: string;
 };
 
+export const platformCodes = ["temu", "amazon", "tiktok_shop", "shopee", "aliexpress"] as const;
+export type PlatformCode = (typeof platformCodes)[number];
+export type Platform = {id: string; code: PlatformCode; name: string; enabled: boolean};
+export type PlatformRuleVersion = {
+  id: string; platform_rule_id: string; platform: PlatformCode; market: string; category: string;
+  image_slot: string; image_type: string; version: string; rule_version: string; effective_date: string;
+  min_width: number | null; min_height: number | null; ratio: string | null; max_size: number | null;
+  text_allowed: boolean; watermark_allowed: boolean; enabled: boolean;
+};
+export type AssetSlot = {id: string; code: string; image_type: string; position: number; label: string | null};
+export type ProductVisualPlan = {
+  id: string; product_id: string; platform_id: string; rule_version_id: string; name: string;
+  market: string; category: string; requested_outputs: Record<string, number>; slots: AssetSlot[]; created_at: string;
+};
+
+export const demoPlatforms: Platform[] = [
+  {id: "platform-temu", code: "temu", name: "Temu", enabled: true},
+  {id: "platform-amazon", code: "amazon", name: "Amazon", enabled: true},
+  {id: "platform-tiktok", code: "tiktok_shop", name: "TikTok Shop", enabled: true},
+  {id: "platform-shopee", code: "shopee", name: "Shopee", enabled: true},
+  {id: "platform-aliexpress", code: "aliexpress", name: "AliExpress", enabled: true},
+];
+export const demoRules: PlatformRuleVersion[] = demoPlatforms.flatMap((platform, platformIndex) =>
+  ["MAIN", "DETAIL", "DIMENSION"].map((imageSlot, slotIndex) => ({
+    id: `rule-${platform.code}-${imageSlot.toLowerCase()}`, platform_rule_id: `definition-${platform.code}-${imageSlot.toLowerCase()}`,
+    platform: platform.code, market: platform.code === "temu" ? "US" : "*", category: "*",
+    image_slot: imageSlot, image_type: imageSlot, version: platform.code === "temu" ? "2.1.0" : "1.0.0",
+    rule_version: platform.code === "temu" ? "2.1.0" : "1.0.0", effective_date: `2026-0${(platformIndex % 5) + 1}-01`,
+    min_width: imageSlot === "DETAIL" ? 1200 : 1600, min_height: imageSlot === "DETAIL" ? 1500 : 1600,
+    ratio: imageSlot === "DETAIL" ? "4:5" : "1:1", max_size: (5 + slotIndex) * 1024 * 1024,
+    text_allowed: imageSlot !== "MAIN", watermark_allowed: false, enabled: true,
+  })),
+);
+export const demoVisualPlans: ProductVisualPlan[] = [{
+  id: "plan-temu-launch", product_id: "demo-kettle", platform_id: "platform-temu", rule_version_id: "rule-temu-main",
+  name: "Temu US 首发视觉方案", market: "US", category: "旅行小家电",
+  requested_outputs: {MAIN: 5, DETAIL: 6, DIMENSION: 2, SCENE: 3, USAGE: 2, PACKAGE: 1, CLOSEUP: 2},
+  slots: [{id: "detail-feature", code: "DETAIL_FEATURE_01", image_type: "DETAIL", position: 1, label: "核心卖点"},
+    {id: "dimension-front", code: "DIMENSION_FRONT", image_type: "DIMENSION", position: 2, label: "正面尺寸"},
+    {id: "usage-home", code: "USAGE_HOME", image_type: "USAGE", position: 3, label: "居家使用"}],
+  created_at: "2026-08-10T10:00:00Z",
+}];
+
 export const demoProducts: Product[] = [
   {
     id: "demo-kettle",
@@ -197,6 +240,23 @@ export async function loadProductWorkspace(productId: string) {
   const assets = await read<Asset[]>(`/products/${productId}/assets`, []);
   if (!product) return {product: demoProducts[0], assets: demoAssets, demo: true};
   return {product, assets, demo: false};
+}
+
+export async function loadPlatformRuleCenter() {
+  const [platforms, rules] = await Promise.all([
+    read<Platform[]>("/platform-rules/platforms", demoPlatforms),
+    read<PlatformRuleVersion[]>("/platform-rules", demoRules),
+  ]);
+  return {platforms, rules, demo: platforms === demoPlatforms || rules === demoRules};
+}
+
+export async function loadVisualPlanCenter(productId?: string) {
+  const [products, platforms, rules, plans] = await Promise.all([
+    read<Product[]>("/products", demoProducts), read<Platform[]>("/platform-rules/platforms", demoPlatforms),
+    read<PlatformRuleVersion[]>("/platform-rules", demoRules),
+    read<ProductVisualPlan[]>(`/visual-plans${productId ? `?product_id=${productId}` : ""}`, demoVisualPlans),
+  ]);
+  return {products, platforms, rules, plans, demo: plans === demoVisualPlans};
 }
 
 export function assetContentUrl(versionId: string) {

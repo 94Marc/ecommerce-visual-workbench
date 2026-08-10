@@ -28,7 +28,7 @@ class GenerationJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("asset_versions.id", ondelete="SET NULL"), nullable=True
     )
     resolved_rule_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("platform_rules.id", ondelete="RESTRICT")
+        ForeignKey("rule_versions.id", ondelete="RESTRICT")
     )
     platform: Mapped[PlatformCode] = mapped_column(Enum(PlatformCode), index=True)
     market: Mapped[str] = mapped_column(String(32))

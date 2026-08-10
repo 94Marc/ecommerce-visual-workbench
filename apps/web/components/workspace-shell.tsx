@@ -1,5 +1,5 @@
 import { cn } from "@ecommerce-visual-workbench/ui";
-import { Archive, Boxes, Image as ImageIcon, ScanLine, ShieldCheck } from "lucide-react";
+import { Archive, Boxes, ClipboardList, Image as ImageIcon, ScanLine, ScrollText, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -7,6 +7,8 @@ const links = [
   {href: "/", label: "生产台", icon: ScanLine},
   {href: "/products/demo-kettle", label: "商品工作区", icon: Boxes},
   {href: "/products/demo-kettle#assets", label: "图片资产", icon: ImageIcon},
+  {href: "/platform-rules", label: "平台规则", icon: ScrollText},
+  {href: "/visual-plans", label: "视觉方案", icon: ClipboardList},
   {href: "/reviews", label: "审核工作台", icon: ShieldCheck},
   {href: "/#exports", label: "导出记录", icon: Archive},
 ];
@@ -18,7 +20,7 @@ export function WorkspaceShell({
   actions,
   children,
 }: {
-  active: "production" | "product" | "review";
+  active: "production" | "product" | "review" | "rules" | "plan";
   eyebrow: string;
   title: string;
   actions?: ReactNode;
@@ -43,7 +45,9 @@ export function WorkspaceShell({
             const selected =
               (active === "production" && href === "/") ||
               (active === "product" && label === "商品工作区") ||
-              (active === "review" && label === "审核工作台");
+              (active === "review" && label === "审核工作台") ||
+              (active === "rules" && label === "平台规则") ||
+              (active === "plan" && label === "视觉方案");
             return (
               <Link
                 key={label}
@@ -62,8 +66,8 @@ export function WorkspaceShell({
           })}
         </nav>
         <div className="mt-8 hidden border-t border-white/10 pt-5 text-xs text-[#8994aa] lg:block">
-          <p className="utility-face tracking-[.12em]">PHASE 1 · NO AI</p>
-          <p className="mt-2 leading-5">规则、版本、审核与导出均使用确定性业务流程。</p>
+          <p className="utility-face tracking-[.12em]">PHASE 2 · NO AI</p>
+          <p className="mt-2 leading-5">平台规则与视觉槽位均使用确定性业务流程。</p>
         </div>
       </aside>
       <main className="min-w-0">

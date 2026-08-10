@@ -1,13 +1,19 @@
 from app.core.database import Base
 
 
-def test_phase_one_schema_contains_all_domain_tables():
+def test_phase_two_schema_contains_all_domain_tables():
     expected = {
         "products",
         "skus",
         "assets",
         "asset_versions",
         "platform_rules",
+        "platforms",
+        "platform_markets",
+        "platform_categories",
+        "rule_versions",
+        "product_visual_plans",
+        "asset_slots",
         "generation_jobs",
         "reviews",
         "export_bundles",
@@ -30,7 +36,20 @@ def test_generation_jobs_pin_source_and_rule_foreign_keys():
     table = Base.metadata.tables["generation_jobs"]
     targets = {foreign_key.target_fullname for foreign_key in table.foreign_keys}
     assert "asset_versions.id" in targets
-    assert "platform_rules.id" in targets
+    assert "rule_versions.id" in targets
+
+
+def test_visual_plans_pin_product_platform_and_rule_version():
+    targets = {
+        key.target_fullname for key in Base.metadata.tables["product_visual_plans"].foreign_keys
+    }
+    assert targets == {"products.id", "platforms.id", "rule_versions.id"}
+
+
+def test_assets_can_bind_to_one_planned_slot():
+    column = Base.metadata.tables["assets"].c.asset_slot_id
+    assert {key.target_fullname for key in column.foreign_keys} == {"asset_slots.id"}
+    assert column.unique is True
 
 
 def test_visual_workspace_state_and_soft_delete_columns_exist():
