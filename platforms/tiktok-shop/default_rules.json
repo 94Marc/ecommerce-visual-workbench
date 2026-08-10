@@ -1,0 +1,3 @@
+[
+  {"platform":"tiktok_shop","market":"*","category":"*","image_slot":"MAIN","rule_version":"1.0.0","effective_date":"2026-01-01","constraints":{"min_width":600,"min_height":600,"aspect_ratios":["1:1"],"formats":["image/jpeg","image/png"]}}
+]

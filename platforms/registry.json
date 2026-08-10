@@ -1,0 +1,9 @@
+{
+  "platforms": [
+    {"code": "temu", "name": "Temu", "primary": true},
+    {"code": "amazon", "name": "Amazon", "primary": false},
+    {"code": "tiktok_shop", "name": "TikTok Shop", "primary": false},
+    {"code": "shopee", "name": "Shopee", "primary": false},
+    {"code": "aliexpress", "name": "AliExpress", "primary": false}
+  ]
+}
