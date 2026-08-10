@@ -12,5 +12,5 @@ dist/
 coverage/
 *.log
 .DS_Store
-data/
-exports/
+/data/
+/exports/
