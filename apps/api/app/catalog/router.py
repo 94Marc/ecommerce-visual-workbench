@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.catalog.schemas import ProductCreate, ProductRead, ProductUpdate, SKUCreate, SKURead
@@ -20,8 +20,11 @@ def create_product(data: ProductCreate, catalog: CatalogService = Depends(servic
 
 
 @router.get("", response_model=list[ProductRead])
-def list_products(catalog: CatalogService = Depends(service)):
-    return catalog.list_products()
+def list_products(
+    include_archived: bool = Query(default=False),
+    catalog: CatalogService = Depends(service),
+):
+    return catalog.list_products(include_archived=include_archived)
 
 
 @router.get("/{product_id}", response_model=ProductRead)
@@ -50,3 +53,20 @@ def add_sku(product_id: uuid.UUID, data: SKUCreate, catalog: CatalogService = De
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except DuplicateSKUError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+def archive_product(product_id: uuid.UUID, catalog: CatalogService = Depends(service)):
+    try:
+        catalog.archive_product(product_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except CatalogNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/{product_id}/restore", response_model=ProductRead)
+def restore_product(product_id: uuid.UUID, catalog: CatalogService = Depends(service)):
+    try:
+        return catalog.restore_product(product_id)
+    except CatalogNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

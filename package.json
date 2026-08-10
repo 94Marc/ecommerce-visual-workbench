@@ -6,7 +6,7 @@
     "dev": "npm run dev --workspace @ecommerce-visual-workbench/web",
     "build": "npm run build --workspace @ecommerce-visual-workbench/web",
     "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   }
 }
-

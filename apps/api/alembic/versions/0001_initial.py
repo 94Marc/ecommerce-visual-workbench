@@ -30,6 +30,8 @@ def upgrade() -> None:
         sa.Column("weight_value", sa.Numeric(12, 3)),
         sa.Column("weight_unit", sa.String(16)),
         sa.Column("selling_points", sa.JSON(), nullable=False),
+        sa.Column("is_archived", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("archived_at", sa.DateTime(timezone=True)),
         *timestamps(),
     )
     op.create_index("ix_products_category", "products", ["category"])
@@ -77,6 +79,8 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("label", sa.String(200)),
+        sa.Column("is_archived", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("archived_at", sa.DateTime(timezone=True)),
         *timestamps(),
     )
     op.create_index("ix_assets_product_type", "assets", ["product_id", "asset_type"])
@@ -98,6 +102,20 @@ def upgrade() -> None:
         sa.Column("width", sa.Integer()),
         sa.Column("height", sa.Integer()),
         sa.Column("checksum_sha256", sa.String(64), nullable=False),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "DRAFT",
+                "PROCESSING",
+                "REVIEW",
+                "APPROVED",
+                "REJECTED",
+                name="assetstatus",
+            ),
+            nullable=False,
+        ),
+        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("deleted_at", sa.DateTime(timezone=True)),
         sa.Column(
             "source_version_id",
             sa.Uuid(),
@@ -212,6 +230,8 @@ def upgrade() -> None:
         ),
         sa.Column("reviewer", sa.String(120), nullable=False),
         sa.Column("comment", sa.Text()),
+        sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("deleted_at", sa.DateTime(timezone=True)),
         *timestamps(),
     )
     op.create_index("ix_reviews_version_created", "reviews", ["asset_version_id", "created_at"])
@@ -252,5 +272,6 @@ def downgrade() -> None:
         "imageslot",
         "platformcode",
         "assettype",
+        "assetstatus",
     ]:
         sa.Enum(name=enum_name).drop(op.get_bind(), checkfirst=True)

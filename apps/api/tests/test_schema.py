@@ -33,6 +33,17 @@ def test_generation_jobs_pin_source_and_rule_foreign_keys():
     assert "platform_rules.id" in targets
 
 
+def test_visual_workspace_state_and_soft_delete_columns_exist():
+    product_columns = {column.name for column in Base.metadata.tables["products"].columns}
+    asset_columns = {column.name for column in Base.metadata.tables["assets"].columns}
+    version_columns = {column.name for column in Base.metadata.tables["asset_versions"].columns}
+    review_columns = {column.name for column in Base.metadata.tables["reviews"].columns}
+    assert {"is_archived", "archived_at"} <= product_columns
+    assert {"is_archived", "archived_at"} <= asset_columns
+    assert {"status", "is_deleted", "deleted_at"} <= set(version_columns)
+    assert {"is_deleted", "deleted_at"} <= review_columns
+
+
 def test_required_foreign_keys_are_not_nullable():
     required_columns = {
         "skus": ["product_id"],

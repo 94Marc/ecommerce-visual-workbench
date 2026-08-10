@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { summarizeJobs, type GenerationJob } from "./api";
+import { demoAssets, latestVersion, summarizeJobs, type GenerationJob } from "./api";
 
 describe("summarizeJobs", () => {
   it("counts every production state", () => {
@@ -18,3 +18,11 @@ describe("summarizeJobs", () => {
   });
 });
 
+describe("latestVersion", () => {
+  it("returns the highest immutable version number", () => {
+    const asset = demoAssets.find((item) => item.versions.length > 1);
+
+    expect(asset).toBeDefined();
+    expect(latestVersion(asset!)?.version_number).toBe(2);
+  });
+});

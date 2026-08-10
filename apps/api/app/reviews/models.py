@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import Enum, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -26,3 +27,5 @@ class Review(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     decision: Mapped[ReviewDecision] = mapped_column(Enum(ReviewDecision), index=True)
     reviewer: Mapped[str] = mapped_column(String(120))
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

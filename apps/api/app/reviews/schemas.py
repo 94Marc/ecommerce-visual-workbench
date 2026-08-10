@@ -19,9 +19,16 @@ class ReviewRead(ReviewCreate):
     id: uuid.UUID
     asset_version_id: uuid.UUID
     generation_job_id: uuid.UUID
+    is_deleted: bool
+    deleted_at: datetime | None
     created_at: datetime
 
 
 class ReviewOutcome(BaseModel):
     review: ReviewRead
     regenerated_job: GenerationJobRead | None = None
+
+
+class ReviewUpdate(BaseModel):
+    reviewer: str | None = Field(default=None, min_length=1, max_length=120)
+    comment: str | None = Field(default=None, max_length=2000)

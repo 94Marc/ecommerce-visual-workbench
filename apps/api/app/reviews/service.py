@@ -4,13 +4,14 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.assets.models import AssetVersion
+from app.assets.models import AssetStatus, AssetVersion
+from app.core.models import utc_now
 from app.jobs.models import GenerationJob, JobStatus
 from app.jobs.queue import JobDispatcher
 from app.jobs.schemas import GenerationJobCreate
 from app.jobs.service import JobService
 from app.reviews.models import Review, ReviewDecision
-from app.reviews.schemas import ReviewCreate
+from app.reviews.schemas import ReviewCreate, ReviewUpdate
 
 
 class ReviewNotFoundError(LookupError):
@@ -51,6 +52,11 @@ class ReviewService:
             **data.model_dump(),
         )
         self.session.add(review)
+        version.status = {
+            ReviewDecision.APPROVED: AssetStatus.APPROVED,
+            ReviewDecision.REJECTED: AssetStatus.REJECTED,
+            ReviewDecision.REGENERATE: AssetStatus.REJECTED,
+        }[data.decision]
         self.session.commit()
         self.session.refresh(review)
 
@@ -72,15 +78,77 @@ class ReviewService:
         return list(
             self.session.scalars(
                 select(Review)
-                .where(Review.asset_version_id == asset_version_id)
+                .where(
+                    Review.asset_version_id == asset_version_id,
+                    Review.is_deleted.is_(False),
+                )
                 .order_by(Review.created_at.desc())
             )
         )
 
+    def get_review(self, review_id: uuid.UUID, asset_version_id: uuid.UUID | None = None) -> Review:
+        review = self.session.get(Review, review_id)
+        if (
+            review is None
+            or review.is_deleted
+            or (asset_version_id is not None and review.asset_version_id != asset_version_id)
+        ):
+            raise ReviewNotFoundError(f"review {review_id} not found")
+        return review
+
+    def update_review(
+        self,
+        review_id: uuid.UUID,
+        data: ReviewUpdate,
+        asset_version_id: uuid.UUID | None = None,
+    ) -> Review:
+        review = self.get_review(review_id, asset_version_id)
+        for field, value in data.model_dump(exclude_unset=True).items():
+            setattr(review, field, value)
+        self.session.commit()
+        self.session.refresh(review)
+        return review
+
+    def delete_review(
+        self, review_id: uuid.UUID, asset_version_id: uuid.UUID | None = None
+    ) -> None:
+        review = self.get_review(review_id, asset_version_id)
+        review.is_deleted = True
+        review.deleted_at = utc_now()
+        self.session.commit()
+        self._sync_version_status(review.asset_version_id)
+
+    def _sync_version_status(self, asset_version_id: uuid.UUID) -> None:
+        version = self.session.get(AssetVersion, asset_version_id)
+        if version is None:
+            return
+        latest = self.session.scalar(
+            select(Review)
+            .where(
+                Review.asset_version_id == asset_version_id,
+                Review.is_deleted.is_(False),
+            )
+            .order_by(Review.created_at.desc())
+            .limit(1)
+        )
+        version.status = (
+            {
+                ReviewDecision.APPROVED: AssetStatus.APPROVED,
+                ReviewDecision.REJECTED: AssetStatus.REJECTED,
+                ReviewDecision.REGENERATE: AssetStatus.REJECTED,
+            }[latest.decision]
+            if latest
+            else AssetStatus.REVIEW
+        )
+        self.session.commit()
+
     def latest_decision(self, asset_version_id: uuid.UUID) -> ReviewDecision | None:
         review = self.session.scalar(
             select(Review)
-            .where(Review.asset_version_id == asset_version_id)
+            .where(
+                Review.asset_version_id == asset_version_id,
+                Review.is_deleted.is_(False),
+            )
             .order_by(Review.created_at.desc())
             .limit(1)
         )

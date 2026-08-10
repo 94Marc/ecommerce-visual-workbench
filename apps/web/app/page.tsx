@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import Link from "next/link";
 
 import { EditorPreview } from "@/components/editor-preview";
 import { loadWorkbench, summarizeJobs } from "@/lib/api";
@@ -56,9 +57,15 @@ export default async function WorkbenchPage() {
 
         <nav className="mt-9 grid grid-cols-3 gap-2 lg:block lg:space-y-1">
           {navigation.map(([label, Icon], index) => (
-            <a
+            <Link
               key={label}
-              href="#"
+              href={
+                index === 1
+                  ? `/products/${activeProduct?.id ?? "demo-kettle"}`
+                  : index === 4
+                    ? "/reviews"
+                    : "#"
+              }
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
                 index === 0 ? "bg-white text-[#172033]" : "text-[#9ba6ba] hover:bg-white/5 hover:text-white",
@@ -67,7 +74,7 @@ export default async function WorkbenchPage() {
               <Icon className="h-4 w-4" />
               <span>{label}</span>
               {index === 4 && <span className="ml-auto rounded-full bg-[#ff6433] px-1.5 text-[10px] text-white">2</span>}
-            </a>
+            </Link>
           ))}
         </nav>
 

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.catalog.models import SKU, Product
 from app.catalog.schemas import ProductCreate, ProductUpdate, SKUCreate
+from app.core.models import utc_now
 
 
 class CatalogNotFoundError(LookupError):
@@ -28,8 +29,11 @@ class CatalogService:
         self.session.commit()
         return self.get_product(product.id)
 
-    def list_products(self) -> list[Product]:
-        statement = select(Product).options(selectinload(Product.skus)).order_by(Product.created_at)
+    def list_products(self, *, include_archived: bool = False) -> list[Product]:
+        statement = select(Product).options(selectinload(Product.skus))
+        if not include_archived:
+            statement = statement.where(Product.is_archived.is_(False))
+        statement = statement.order_by(Product.created_at)
         return list(self.session.scalars(statement).unique())
 
     def get_product(self, product_id: uuid.UUID) -> Product:
@@ -64,3 +68,16 @@ class CatalogService:
             raise DuplicateSKUError(f"SKU code {data.code} already exists") from exc
         self.session.refresh(sku)
         return sku
+
+    def archive_product(self, product_id: uuid.UUID) -> None:
+        product = self.get_product(product_id)
+        product.is_archived = True
+        product.archived_at = utc_now()
+        self.session.commit()
+
+    def restore_product(self, product_id: uuid.UUID) -> Product:
+        product = self.get_product(product_id)
+        product.is_archived = False
+        product.archived_at = None
+        self.session.commit()
+        return self.get_product(product_id)
