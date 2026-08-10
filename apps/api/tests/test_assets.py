@@ -1,9 +1,9 @@
+import pytest
 from app.assets.models import AssetType
 from app.assets.service import AssetInvariantError, AssetService
 from app.catalog.schemas import ProductCreate
 from app.catalog.service import CatalogService
 
-import pytest
 from tests.conftest import MemoryObjectStorage
 
 
