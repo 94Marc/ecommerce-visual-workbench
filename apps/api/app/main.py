@@ -5,6 +5,7 @@ from app.assets.router import router as assets_router
 from app.catalog.router import router as catalog_router
 from app.core.config import get_settings
 from app.jobs.router import router as jobs_router
+from app.reviews.router import router as reviews_router
 from app.rules.router import router as rules_router
 
 
@@ -27,6 +28,7 @@ def create_app() -> FastAPI:
     app.include_router(assets_router, prefix=settings.api_prefix)
     app.include_router(rules_router, prefix=settings.api_prefix)
     app.include_router(jobs_router, prefix=settings.api_prefix)
+    app.include_router(reviews_router, prefix=settings.api_prefix)
     return app
 
 
