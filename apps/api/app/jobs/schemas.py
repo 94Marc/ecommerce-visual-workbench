@@ -29,4 +29,3 @@ class GenerationJobRead(GenerationJobCreate):
     completed_at: datetime | None
     created_at: datetime
     updated_at: datetime
-

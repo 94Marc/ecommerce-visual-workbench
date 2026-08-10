@@ -25,4 +25,3 @@ class ReviewRead(ReviewCreate):
 class ReviewOutcome(BaseModel):
     review: ReviewRead
     regenerated_job: GenerationJobRead | None = None
-

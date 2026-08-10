@@ -47,9 +47,7 @@ def test_processing_creates_new_asset_and_version(session):
 
 def test_original_chain_rejects_processed_versions(session):
     storage = MemoryObjectStorage()
-    product = CatalogService(session).create_product(
-        ProductCreate(name="Bag", category="fashion")
-    )
+    product = CatalogService(session).create_product(ProductCreate(name="Bag", category="fashion"))
     assets = AssetService(session, storage)
     original = assets.create_original(product.id, b"raw", "raw.png", "image/png")
 

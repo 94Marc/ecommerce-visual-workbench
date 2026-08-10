@@ -37,7 +37,12 @@ def upgrade() -> None:
     op.create_table(
         "skus",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("product_id", sa.Uuid(), sa.ForeignKey("products.id", ondelete="CASCADE")),
+        sa.Column(
+            "product_id",
+            sa.Uuid(),
+            sa.ForeignKey("products.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("code", sa.String(100), nullable=False, unique=True),
         sa.Column("attributes", sa.JSON(), nullable=False),
         *timestamps(),
@@ -47,13 +52,27 @@ def upgrade() -> None:
     op.create_table(
         "assets",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("product_id", sa.Uuid(), sa.ForeignKey("products.id", ondelete="CASCADE")),
+        sa.Column(
+            "product_id",
+            sa.Uuid(),
+            sa.ForeignKey("products.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("sku_id", sa.Uuid(), sa.ForeignKey("skus.id", ondelete="SET NULL")),
         sa.Column(
             "asset_type",
             sa.Enum(
-                "ORIGINAL", "CUTOUT", "MAIN", "DETAIL", "DIMENSION", "SCENE",
-                "USAGE", "PACKAGE", "CLOSEUP", "COMPARE", name="assettype"
+                "ORIGINAL",
+                "CUTOUT",
+                "MAIN",
+                "DETAIL",
+                "DIMENSION",
+                "SCENE",
+                "USAGE",
+                "PACKAGE",
+                "CLOSEUP",
+                "COMPARE",
+                name="assettype",
             ),
             nullable=False,
         ),
@@ -65,7 +84,12 @@ def upgrade() -> None:
     op.create_table(
         "asset_versions",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("asset_id", sa.Uuid(), sa.ForeignKey("assets.id", ondelete="CASCADE")),
+        sa.Column(
+            "asset_id",
+            sa.Uuid(),
+            sa.ForeignKey("assets.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("version_number", sa.Integer(), nullable=False),
         sa.Column("object_key", sa.String(500), nullable=False, unique=True),
         sa.Column("original_filename", sa.String(255), nullable=False),
@@ -96,7 +120,17 @@ def upgrade() -> None:
         sa.Column("category", sa.String(120), nullable=False),
         sa.Column(
             "image_slot",
-            sa.Enum("MAIN", "DETAIL", "DIMENSION", "SCENE", "USAGE", "PACKAGE", "CLOSEUP", "COMPARE", name="imageslot"),
+            sa.Enum(
+                "MAIN",
+                "DETAIL",
+                "DIMENSION",
+                "SCENE",
+                "USAGE",
+                "PACKAGE",
+                "CLOSEUP",
+                "COMPARE",
+                name="imageslot",
+            ),
             nullable=False,
         ),
         sa.Column("rule_version", sa.String(32), nullable=False),
@@ -105,7 +139,11 @@ def upgrade() -> None:
         sa.Column("enabled", sa.Boolean(), nullable=False),
         *timestamps(),
         sa.UniqueConstraint(
-            "platform", "market", "category", "image_slot", "rule_version",
+            "platform",
+            "market",
+            "category",
+            "image_slot",
+            "rule_version",
             name="uq_platform_rule_version",
         ),
     )
@@ -118,28 +156,60 @@ def upgrade() -> None:
     op.create_table(
         "generation_jobs",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("source_version_id", sa.Uuid(), sa.ForeignKey("asset_versions.id", ondelete="RESTRICT")),
-        sa.Column("output_version_id", sa.Uuid(), sa.ForeignKey("asset_versions.id", ondelete="SET NULL")),
-        sa.Column("resolved_rule_id", sa.Uuid(), sa.ForeignKey("platform_rules.id", ondelete="RESTRICT")),
+        sa.Column(
+            "source_version_id",
+            sa.Uuid(),
+            sa.ForeignKey("asset_versions.id", ondelete="RESTRICT"),
+            nullable=False,
+        ),
+        sa.Column(
+            "output_version_id", sa.Uuid(), sa.ForeignKey("asset_versions.id", ondelete="SET NULL")
+        ),
+        sa.Column(
+            "resolved_rule_id",
+            sa.Uuid(),
+            sa.ForeignKey("platform_rules.id", ondelete="RESTRICT"),
+            nullable=False,
+        ),
         sa.Column("platform", sa.Enum(name="platformcode", create_type=False), nullable=False),
         sa.Column("market", sa.String(32), nullable=False),
         sa.Column("category", sa.String(120), nullable=False),
         sa.Column("image_slot", sa.Enum(name="imageslot", create_type=False), nullable=False),
-        sa.Column("status", sa.Enum("PENDING", "PROCESSING", "COMPLETED", "FAILED", name="jobstatus"), nullable=False),
+        sa.Column(
+            "status",
+            sa.Enum("PENDING", "PROCESSING", "COMPLETED", "FAILED", name="jobstatus"),
+            nullable=False,
+        ),
         sa.Column("parameters", sa.JSON(), nullable=False),
         sa.Column("error_message", sa.String(1000)),
         sa.Column("started_at", sa.DateTime(timezone=True)),
         sa.Column("completed_at", sa.DateTime(timezone=True)),
         *timestamps(),
     )
-    op.create_index("ix_generation_jobs_status_created", "generation_jobs", ["status", "created_at"])
+    op.create_index(
+        "ix_generation_jobs_status_created", "generation_jobs", ["status", "created_at"]
+    )
 
     op.create_table(
         "reviews",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("asset_version_id", sa.Uuid(), sa.ForeignKey("asset_versions.id", ondelete="RESTRICT")),
-        sa.Column("generation_job_id", sa.Uuid(), sa.ForeignKey("generation_jobs.id", ondelete="RESTRICT")),
-        sa.Column("decision", sa.Enum("APPROVED", "REJECTED", "REGENERATE", name="reviewdecision"), nullable=False),
+        sa.Column(
+            "asset_version_id",
+            sa.Uuid(),
+            sa.ForeignKey("asset_versions.id", ondelete="RESTRICT"),
+            nullable=False,
+        ),
+        sa.Column(
+            "generation_job_id",
+            sa.Uuid(),
+            sa.ForeignKey("generation_jobs.id", ondelete="RESTRICT"),
+            nullable=False,
+        ),
+        sa.Column(
+            "decision",
+            sa.Enum("APPROVED", "REJECTED", "REGENERATE", name="reviewdecision"),
+            nullable=False,
+        ),
         sa.Column("reviewer", sa.String(120), nullable=False),
         sa.Column("comment", sa.Text()),
         *timestamps(),
@@ -149,7 +219,12 @@ def upgrade() -> None:
     op.create_table(
         "export_bundles",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("product_id", sa.Uuid(), sa.ForeignKey("products.id", ondelete="RESTRICT")),
+        sa.Column(
+            "product_id",
+            sa.Uuid(),
+            sa.ForeignKey("products.id", ondelete="RESTRICT"),
+            nullable=False,
+        ),
         sa.Column("platform", sa.Enum(name="platformcode", create_type=False), nullable=False),
         sa.Column("market", sa.String(32), nullable=False),
         sa.Column("category", sa.String(120), nullable=False),
@@ -171,7 +246,11 @@ def downgrade() -> None:
     op.drop_table("skus")
     op.drop_table("products")
     for enum_name in [
-        "exportstatus", "reviewdecision", "jobstatus", "imageslot", "platformcode", "assettype"
+        "exportstatus",
+        "reviewdecision",
+        "jobstatus",
+        "imageslot",
+        "platformcode",
+        "assettype",
     ]:
         sa.Enum(name=enum_name).drop(op.get_bind(), checkfirst=True)
-

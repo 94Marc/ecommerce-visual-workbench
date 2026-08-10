@@ -85,4 +85,3 @@ class ReviewService:
             .limit(1)
         )
         return review.decision if review else None
-

@@ -51,30 +51,28 @@ class RuleService:
         as_of: date | None = None,
     ) -> PlatformRule:
         target_date = as_of or date.today()
-        statement = (
-            select(PlatformRule)
-            .where(
-                PlatformRule.platform == platform,
-                PlatformRule.market.in_([market, "*"]),
-                PlatformRule.category.in_([category, "*"]),
-                PlatformRule.image_slot == image_slot,
-                PlatformRule.effective_date <= target_date,
-                PlatformRule.enabled.is_(True),
-            )
-            .order_by(
-                (PlatformRule.market == market).desc(),
-                (PlatformRule.category == category).desc(),
-                PlatformRule.effective_date.desc(),
-                PlatformRule.rule_version.desc(),
-            )
-            .limit(1)
+        statement = select(PlatformRule).where(
+            PlatformRule.platform == platform,
+            PlatformRule.market.in_([market, "*"]),
+            PlatformRule.category.in_([category, "*"]),
+            PlatformRule.image_slot == image_slot,
+            PlatformRule.effective_date <= target_date,
+            PlatformRule.enabled.is_(True),
         )
-        rule = self.session.scalar(statement)
-        if rule is None:
+        candidates = list(self.session.scalars(statement))
+        if not candidates:
             raise RuleNotFoundError(
                 f"no effective rule for {platform}/{market}/{category}/{image_slot}"
             )
-        return rule
+        return max(
+            candidates,
+            key=lambda rule: (
+                rule.market == market,
+                rule.category == category,
+                rule.effective_date,
+                self._parse_version(rule.rule_version),
+            ),
+        )
 
     def validate_image(self, rule: PlatformRule, image: ImageProbe) -> RuleValidationResult:
         constraints = rule.constraints
@@ -101,3 +99,7 @@ class RuleService:
         width, height = value.split(":", 1)
         return float(width) / float(height)
 
+    @staticmethod
+    def _parse_version(value: str) -> tuple[int, int, int]:
+        major, minor, patch = (int(part) for part in value.split("."))
+        return major, minor, patch

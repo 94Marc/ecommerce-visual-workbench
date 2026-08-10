@@ -35,4 +35,3 @@ def resolve_rule(data: RuleResolutionRequest, rules: RuleService = Depends(servi
         return rules.resolve(**data.model_dump())
     except RuleNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-

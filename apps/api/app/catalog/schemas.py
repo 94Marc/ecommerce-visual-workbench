@@ -71,4 +71,3 @@ class ProductRead(BaseModel):
     skus: list[SKURead]
     created_at: datetime
     updated_at: datetime
-

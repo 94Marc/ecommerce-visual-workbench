@@ -33,4 +33,3 @@ class AssetRead(BaseModel):
     label: str | None
     versions: list[AssetVersionRead]
     created_at: datetime
-

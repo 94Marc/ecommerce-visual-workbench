@@ -26,4 +26,3 @@ class Review(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     decision: Mapped[ReviewDecision] = mapped_column(Enum(ReviewDecision), index=True)
     reviewer: Mapped[str] = mapped_column(String(120))
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
-

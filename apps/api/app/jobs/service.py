@@ -29,9 +29,7 @@ class JobService:
         rule = RuleService(self.session).resolve(
             data.platform, data.market, data.category, data.image_slot
         )
-        job = GenerationJob(
-            **data.model_dump(), resolved_rule_id=rule.id, status=JobStatus.PENDING
-        )
+        job = GenerationJob(**data.model_dump(), resolved_rule_id=rule.id, status=JobStatus.PENDING)
         self.session.add(job)
         self.session.commit()
         self.session.refresh(job)
@@ -49,4 +47,3 @@ class JobService:
         if status:
             statement = statement.where(GenerationJob.status == status)
         return list(self.session.scalars(statement.order_by(GenerationJob.created_at.desc())))
-

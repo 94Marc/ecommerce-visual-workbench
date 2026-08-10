@@ -108,9 +108,7 @@ class AssetService:
         return version
 
     def get_asset(self, asset_id: uuid.UUID) -> Asset:
-        statement = (
-            select(Asset).where(Asset.id == asset_id).options(selectinload(Asset.versions))
-        )
+        statement = select(Asset).where(Asset.id == asset_id).options(selectinload(Asset.versions))
         asset = self.session.scalar(statement)
         if asset is None:
             raise AssetNotFoundError(f"asset {asset_id} not found")

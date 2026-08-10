@@ -24,4 +24,3 @@ class ExportRead(ExportCreate):
     checksum_sha256: str
     status: ExportStatus
     created_at: datetime
-

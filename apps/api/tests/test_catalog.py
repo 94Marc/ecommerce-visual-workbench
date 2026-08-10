@@ -30,12 +30,8 @@ def test_product_and_sku_flow(client):
 
 
 def test_sku_code_is_unique(client):
-    first = client.post(
-        "/api/v1/products", json={"name": "A", "category": "demo"}
-    ).json()
-    second = client.post(
-        "/api/v1/products", json={"name": "B", "category": "demo"}
-    ).json()
+    first = client.post("/api/v1/products", json={"name": "A", "category": "demo"}).json()
+    second = client.post("/api/v1/products", json={"name": "B", "category": "demo"}).json()
     payload = {"code": "SHARED", "attributes": {}}
 
     assert client.post(f"/api/v1/products/{first['id']}/skus", json=payload).status_code == 201
@@ -49,4 +45,3 @@ def test_weight_requires_unit(client):
         json={"name": "Incomplete", "category": "demo", "weight_value": 1.2},
     )
     assert response.status_code == 422
-

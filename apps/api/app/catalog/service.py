@@ -34,9 +34,7 @@ class CatalogService:
 
     def get_product(self, product_id: uuid.UUID) -> Product:
         statement = (
-            select(Product)
-            .where(Product.id == product_id)
-            .options(selectinload(Product.skus))
+            select(Product).where(Product.id == product_id).options(selectinload(Product.skus))
         )
         product = self.session.scalar(statement)
         if product is None:

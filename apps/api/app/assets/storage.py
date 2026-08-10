@@ -33,4 +33,3 @@ class S3ObjectStorage:
 
 def get_object_storage() -> ObjectStorage:
     return S3ObjectStorage()
-

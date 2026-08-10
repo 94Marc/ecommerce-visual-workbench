@@ -94,4 +94,3 @@ def test_completed_job_is_idempotent(session):
     first_output = first.output_version_id
 
     assert worker.process(job.id).output_version_id == first_output
-

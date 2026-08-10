@@ -44,4 +44,3 @@ class ImageProbe(BaseModel):
 class RuleValidationResult(BaseModel):
     valid: bool
     violations: list[str]
-

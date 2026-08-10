@@ -32,7 +32,11 @@ class PlatformRule(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "platform_rules"
     __table_args__ = (
         UniqueConstraint(
-            "platform", "market", "category", "image_slot", "rule_version",
+            "platform",
+            "market",
+            "category",
+            "image_slot",
+            "rule_version",
             name="uq_platform_rule_version",
         ),
     )

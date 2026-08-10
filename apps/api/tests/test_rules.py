@@ -28,12 +28,14 @@ def test_resolves_latest_effective_rule(session):
     current = rules.create_rule(rule("1.1.0", date(2026, 6, 1)))
     rules.create_rule(rule("2.0.0", date(2027, 1, 1)))
 
-    assert rules.resolve(
-        PlatformCode.TEMU, "US", "kitchen", ImageSlot.MAIN, date(2026, 8, 10)
-    ).id == current.id
-    assert rules.resolve(
-        PlatformCode.TEMU, "US", "kitchen", ImageSlot.MAIN, date(2026, 2, 1)
-    ).id == old.id
+    assert (
+        rules.resolve(PlatformCode.TEMU, "US", "kitchen", ImageSlot.MAIN, date(2026, 8, 10)).id
+        == current.id
+    )
+    assert (
+        rules.resolve(PlatformCode.TEMU, "US", "kitchen", ImageSlot.MAIN, date(2026, 2, 1)).id
+        == old.id
+    )
 
 
 def test_rule_validation_returns_specific_violations(session):
@@ -51,9 +53,17 @@ def test_no_future_rule_is_resolved(session):
     rules = RuleService(session)
     rules.create_rule(rule("2.0.0", date(2027, 1, 1)))
     with pytest.raises(RuleNotFoundError):
-        rules.resolve(
-            PlatformCode.TEMU, "US", "kitchen", ImageSlot.MAIN, date(2026, 8, 10)
-        )
+        rules.resolve(PlatformCode.TEMU, "US", "kitchen", ImageSlot.MAIN, date(2026, 8, 10))
+
+
+def test_semantic_rule_version_breaks_same_day_ties(session):
+    rules = RuleService(session)
+    rules.create_rule(rule("2.0.0", date(2026, 1, 1)))
+    latest = rules.create_rule(rule("10.0.0", date(2026, 1, 1)))
+
+    resolved = rules.resolve(PlatformCode.TEMU, "US", "kitchen", ImageSlot.MAIN, date(2026, 8, 10))
+
+    assert resolved.id == latest.id
 
 
 def test_all_platforms_have_registered_seed_frameworks():
@@ -64,4 +74,3 @@ def test_all_platforms_have_registered_seed_frameworks():
     for entry in registry["platforms"]:
         folder = entry["code"].replace("_", "-")
         assert (root / "platforms" / folder / "default_rules.json").is_file()
-

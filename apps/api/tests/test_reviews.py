@@ -22,9 +22,11 @@ def completed_output(session, storage, dispatcher):
     product = CatalogService(session).create_product(
         ProductCreate(name="Organizer", category="home")
     )
-    source = AssetService(session, storage).create_original(
-        product.id, b"raw", "organizer.jpg", "image/jpeg"
-    ).versions[0]
+    source = (
+        AssetService(session, storage)
+        .create_original(product.id, b"raw", "organizer.jpg", "image/jpeg")
+        .versions[0]
+    )
     RuleService(session).create_rule(
         PlatformRuleCreate(
             platform=PlatformCode.TEMU,
@@ -90,4 +92,3 @@ def test_original_asset_cannot_be_reviewed(session):
             source.id,
             ReviewCreate(decision=ReviewDecision.REJECTED, reviewer="Mina"),
         )
-

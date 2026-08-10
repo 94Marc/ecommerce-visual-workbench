@@ -124,4 +124,3 @@ class ExportService:
 class _NoopDispatcher:
     def enqueue(self, job_id: uuid.UUID) -> None:
         raise RuntimeError("export review lookup must not enqueue jobs")
-

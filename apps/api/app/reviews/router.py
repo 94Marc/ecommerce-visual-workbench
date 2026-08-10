@@ -36,4 +36,3 @@ def create_review(
 @router.get("", response_model=list[ReviewRead])
 def list_reviews(asset_version_id: uuid.UUID, reviews: ReviewService = Depends(service)):
     return reviews.list_reviews(asset_version_id)
-

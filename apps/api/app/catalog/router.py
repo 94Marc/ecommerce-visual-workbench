@@ -50,4 +50,3 @@ def add_sku(product_id: uuid.UUID, data: SKUCreate, catalog: CatalogService = De
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except DuplicateSKUError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-

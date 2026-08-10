@@ -28,4 +28,3 @@ class ExportBundle(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     manifest: Mapped[dict[str, Any]] = mapped_column(JSON)
     checksum_sha256: Mapped[str] = mapped_column(String(64))
     status: Mapped[ExportStatus] = mapped_column(Enum(ExportStatus), default=ExportStatus.READY)
-

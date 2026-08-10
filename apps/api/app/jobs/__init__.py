@@ -1,2 +1,1 @@
 """Image generation job domain."""
-

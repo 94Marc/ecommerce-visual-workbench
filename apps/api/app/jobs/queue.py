@@ -22,4 +22,3 @@ class RedisJobDispatcher:
 
 def get_job_dispatcher() -> JobDispatcher:
     return RedisJobDispatcher()
-

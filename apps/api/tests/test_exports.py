@@ -26,9 +26,11 @@ def generated_scope(session, storage, dispatcher):
     product = CatalogService(session).create_product(
         ProductCreate(name="Packing cubes", category="travel")
     )
-    source = AssetService(session, storage).create_original(
-        product.id, b"supplier", "cubes.jpg", "image/jpeg"
-    ).versions[0]
+    source = (
+        AssetService(session, storage)
+        .create_original(product.id, b"supplier", "cubes.jpg", "image/jpeg")
+        .versions[0]
+    )
     RuleService(session).create_rule(
         PlatformRuleCreate(
             platform=PlatformCode.TEMU,
@@ -96,4 +98,3 @@ def test_export_rejects_scope_without_approved_assets(session):
                 category="travel",
             )
         )
-

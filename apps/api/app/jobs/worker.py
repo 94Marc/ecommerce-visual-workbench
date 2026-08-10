@@ -89,4 +89,3 @@ class GenerationWorker:
             self.session.commit()
         self.session.refresh(job)
         return job
-

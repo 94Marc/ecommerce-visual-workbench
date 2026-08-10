@@ -61,4 +61,3 @@ def get_asset(asset_id: uuid.UUID, assets: AssetService = Depends(service)):
         return assets.get_asset(asset_id)
     except AssetNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-
