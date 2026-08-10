@@ -1,0 +1,43 @@
+@import "tailwindcss";
+@source "../../../packages/ui/src";
+@source "../../../packages/editor/src";
+
+:root {
+  color-scheme: light;
+  --ink: #172033;
+  --muted: #667085;
+  --paper: #f3f6fa;
+  --line: #dfe4ec;
+  --signal: #ff6433;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--paper); }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+}
+button, a { -webkit-tap-highlight-color: transparent; }
+::selection { background: #ffd7ca; color: #7a240b; }
+
+.display-face { font-family: Bahnschrift, "Arial Narrow", sans-serif; letter-spacing: -0.035em; }
+.utility-face { font-family: "Cascadia Code", "JetBrains Mono", monospace; }
+.crop-corners {
+  background:
+    linear-gradient(var(--signal), var(--signal)) left top / 18px 2px no-repeat,
+    linear-gradient(var(--signal), var(--signal)) left top / 2px 18px no-repeat,
+    linear-gradient(var(--signal), var(--signal)) right top / 18px 2px no-repeat,
+    linear-gradient(var(--signal), var(--signal)) right top / 2px 18px no-repeat,
+    linear-gradient(var(--signal), var(--signal)) left bottom / 18px 2px no-repeat,
+    linear-gradient(var(--signal), var(--signal)) left bottom / 2px 18px no-repeat,
+    linear-gradient(var(--signal), var(--signal)) right bottom / 18px 2px no-repeat,
+    linear-gradient(var(--signal), var(--signal)) right bottom / 2px 18px no-repeat;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .signal-pulse { animation: signal-pulse 2.2s ease-in-out infinite; }
+  @keyframes signal-pulse { 50% { opacity: .45; transform: scale(.82); } }
+}
+

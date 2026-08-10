@@ -1,0 +1,14 @@
+{
+  "name": "@ecommerce-visual-workbench/editor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {".": "./src/index.tsx"},
+  "dependencies": {
+    "konva": "^9.3.18",
+    "react": "^19.0.0",
+    "react-konva": "^19.0.3"
+  },
+  "peerDependencies": {"react": "^19.0.0", "react-dom": "^19.0.0"}
+}
+
