@@ -14,4 +14,3 @@ export type ImageSlotCode = (typeof imageSlots)[number]["code"];
 export function findTemplate(code: ImageSlotCode) {
   return imageSlots.find((slot) => slot.code === code) ?? imageSlots[0];
 }
-

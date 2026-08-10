@@ -10,4 +10,3 @@ export function Card({className, ...props}: HTMLAttributes<HTMLDivElement>) {
     />
   );
 }
-

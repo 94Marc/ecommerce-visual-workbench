@@ -8,4 +8,3 @@ describe("platform templates", () => {
     expect(findTemplate("DIMENSION").label).toBe("尺寸图");
   });
 });
-

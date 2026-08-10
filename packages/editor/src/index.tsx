@@ -55,4 +55,3 @@ export function ImageTemplateEditor({guide}: {guide: TemplateGuide}) {
     </div>
   );
 }
-
