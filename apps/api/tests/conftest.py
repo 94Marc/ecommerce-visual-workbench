@@ -8,6 +8,19 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 
+class MemoryObjectStorage:
+    def __init__(self):
+        self.objects: dict[str, bytes] = {}
+
+    def put(self, key: str, content: bytes, content_type: str) -> None:
+        if key in self.objects:
+            raise AssertionError("object keys must never be overwritten")
+        self.objects[key] = content
+
+    def get(self, key: str) -> bytes:
+        return self.objects[key]
+
+
 @pytest.fixture
 def session() -> Session:
     engine = create_engine(
@@ -22,11 +35,15 @@ def session() -> Session:
 
 @pytest.fixture
 def client(session: Session) -> TestClient:
+    from app.assets.storage import get_object_storage
+
     app = create_app()
+    storage = MemoryObjectStorage()
 
     def override_session():
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[get_object_storage] = lambda: storage
     with TestClient(app) as test_client:
         yield test_client
