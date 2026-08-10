@@ -21,6 +21,14 @@ class MemoryObjectStorage:
         return self.objects[key]
 
 
+class MemoryJobDispatcher:
+    def __init__(self):
+        self.job_ids = []
+
+    def enqueue(self, job_id):
+        self.job_ids.append(job_id)
+
+
 @pytest.fixture
 def session() -> Session:
     engine = create_engine(
@@ -36,14 +44,17 @@ def session() -> Session:
 @pytest.fixture
 def client(session: Session) -> TestClient:
     from app.assets.storage import get_object_storage
+    from app.jobs.queue import get_job_dispatcher
 
     app = create_app()
     storage = MemoryObjectStorage()
+    dispatcher = MemoryJobDispatcher()
 
     def override_session():
         yield session
 
     app.dependency_overrides[get_session] = override_session
     app.dependency_overrides[get_object_storage] = lambda: storage
+    app.dependency_overrides[get_job_dispatcher] = lambda: dispatcher
     with TestClient(app) as test_client:
         yield test_client
