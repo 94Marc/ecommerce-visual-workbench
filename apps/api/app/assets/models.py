@@ -2,7 +2,16 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -22,6 +31,14 @@ class AssetType(StrEnum):
     COMPARE = "COMPARE"
 
 
+class AssetStatus(StrEnum):
+    DRAFT = "DRAFT"
+    PROCESSING = "PROCESSING"
+    REVIEW = "REVIEW"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
 class Asset(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "assets"
 
@@ -33,6 +50,8 @@ class Asset(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     asset_type: Mapped[AssetType] = mapped_column(Enum(AssetType), index=True)
     label: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     versions: Mapped[list["AssetVersion"]] = relationship(
         back_populates="asset",
@@ -60,6 +79,11 @@ class AssetVersion(UUIDPrimaryKeyMixin, Base):
     source_version_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("asset_versions.id", ondelete="RESTRICT"), nullable=True
     )
+    status: Mapped[AssetStatus] = mapped_column(
+        Enum(AssetStatus), default=AssetStatus.DRAFT, index=True
+    )
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     asset: Mapped[Asset] = relationship(back_populates="versions")

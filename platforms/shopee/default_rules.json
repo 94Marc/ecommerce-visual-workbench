@@ -1,0 +1,3 @@
+[
+  {"platform":"shopee","market":"*","category":"*","image_slot":"MAIN","rule_version":"1.0.0","effective_date":"2026-01-01","constraints":{"min_width":800,"min_height":800,"aspect_ratios":["1:1"],"formats":["image/jpeg","image/png"]}}
+]

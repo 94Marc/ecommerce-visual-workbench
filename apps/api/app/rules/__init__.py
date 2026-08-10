@@ -1,0 +1,1 @@
+"""Versioned platform rule domain."""

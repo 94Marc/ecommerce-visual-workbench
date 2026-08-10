@@ -68,7 +68,8 @@ class ProductRead(BaseModel):
     weight_value: Decimal | None
     weight_unit: str | None
     selling_points: list[str]
+    is_archived: bool
+    archived_at: datetime | None
     skus: list[SKURead]
     created_at: datetime
     updated_at: datetime
-

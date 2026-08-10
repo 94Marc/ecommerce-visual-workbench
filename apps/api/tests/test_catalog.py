@@ -30,12 +30,8 @@ def test_product_and_sku_flow(client):
 
 
 def test_sku_code_is_unique(client):
-    first = client.post(
-        "/api/v1/products", json={"name": "A", "category": "demo"}
-    ).json()
-    second = client.post(
-        "/api/v1/products", json={"name": "B", "category": "demo"}
-    ).json()
+    first = client.post("/api/v1/products", json={"name": "A", "category": "demo"}).json()
+    second = client.post("/api/v1/products", json={"name": "B", "category": "demo"}).json()
     payload = {"code": "SHARED", "attributes": {}}
 
     assert client.post(f"/api/v1/products/{first['id']}/skus", json=payload).status_code == 201
@@ -50,3 +46,18 @@ def test_weight_requires_unit(client):
     )
     assert response.status_code == 422
 
+
+def test_product_delete_is_reversible_soft_archive(client):
+    product = client.post(
+        "/api/v1/products", json={"name": "Archive me", "category": "demo"}
+    ).json()
+
+    assert client.delete(f"/api/v1/products/{product['id']}").status_code == 204
+    assert client.get("/api/v1/products").json() == []
+    archived = client.get("/api/v1/products?include_archived=true").json()
+    assert archived[0]["is_archived"] is True
+    assert archived[0]["archived_at"] is not None
+
+    restored = client.post(f"/api/v1/products/{product['id']}/restore")
+    assert restored.status_code == 200
+    assert restored.json()["is_archived"] is False

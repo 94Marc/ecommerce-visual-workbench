@@ -27,5 +27,4 @@ docs/       产品、架构、数据、平台规则与阶段计划
 
 包含商品中心、不可变图片资产、平台规则、模拟生成任务、审核和 ZIP 导出。不包含订单、库存、采购、物流、客服、财务、广告和自动刊登。
 
-详细设计见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 与 [docs/DATA_MODEL.md](docs/DATA_MODEL.md)。
-
+详细设计见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、[docs/DATA_MODEL.md](docs/DATA_MODEL.md) 与 [docs/WORKSPACE_PHASE1.md](docs/WORKSPACE_PHASE1.md)。

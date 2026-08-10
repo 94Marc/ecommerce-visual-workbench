@@ -1,12 +1,14 @@
 import hashlib
+import re
 import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.assets.models import Asset, AssetType, AssetVersion
+from app.assets.models import Asset, AssetStatus, AssetType, AssetVersion
 from app.assets.storage import ObjectStorage
 from app.catalog.models import SKU, Product
+from app.core.models import utc_now
 
 
 class AssetNotFoundError(LookupError):
@@ -57,6 +59,7 @@ class AssetService:
         *,
         width: int | None = None,
         height: int | None = None,
+        status: AssetStatus = AssetStatus.REVIEW,
         label: str | None = None,
     ) -> Asset:
         if asset_type is AssetType.ORIGINAL:
@@ -80,6 +83,7 @@ class AssetService:
             source_version_id=source.id,
             width=width,
             height=height,
+            status=status,
         )
         self.session.commit()
         return self.get_asset(asset.id)
@@ -91,6 +95,7 @@ class AssetService:
         content: bytes,
         filename: str,
         mime_type: str,
+        status: AssetStatus = AssetStatus.DRAFT,
     ) -> AssetVersion:
         asset = self.get_asset(asset_id)
         if asset.asset_type is AssetType.ORIGINAL:
@@ -100,17 +105,22 @@ class AssetService:
         source = self.session.get(AssetVersion, source_version_id)
         if source is None:
             raise AssetNotFoundError(f"asset version {source_version_id} not found")
+        if source.asset.product_id != asset.product_id:
+            raise AssetInvariantError("source version must belong to the same product")
         version = self._store_version(
-            asset, content, filename, mime_type, source_version_id=source_version_id
+            asset,
+            content,
+            filename,
+            mime_type,
+            source_version_id=source_version_id,
+            status=status,
         )
         self.session.commit()
         self.session.refresh(version)
         return version
 
     def get_asset(self, asset_id: uuid.UUID) -> Asset:
-        statement = (
-            select(Asset).where(Asset.id == asset_id).options(selectinload(Asset.versions))
-        )
+        statement = select(Asset).where(Asset.id == asset_id).options(selectinload(Asset.versions))
         asset = self.session.scalar(statement)
         if asset is None:
             raise AssetNotFoundError(f"asset {asset_id} not found")
@@ -119,11 +129,79 @@ class AssetService:
     def list_product_assets(self, product_id: uuid.UUID) -> list[Asset]:
         statement = (
             select(Asset)
-            .where(Asset.product_id == product_id)
+            .where(Asset.product_id == product_id, Asset.is_archived.is_(False))
             .options(selectinload(Asset.versions))
             .order_by(Asset.created_at)
         )
         return list(self.session.scalars(statement).unique())
+
+    def update_asset(self, asset_id: uuid.UUID, *, label: str | None) -> Asset:
+        asset = self.get_asset(asset_id)
+        if asset.asset_type is AssetType.ORIGINAL:
+            raise AssetInvariantError("ORIGINAL assets are immutable")
+        asset.label = label
+        self.session.commit()
+        return self.get_asset(asset_id)
+
+    def archive_asset(self, asset_id: uuid.UUID) -> None:
+        asset = self.get_asset(asset_id)
+        if asset.asset_type is AssetType.ORIGINAL:
+            raise AssetInvariantError("ORIGINAL assets cannot be deleted")
+        asset.is_archived = True
+        asset.archived_at = utc_now()
+        self.session.commit()
+
+    def list_versions(self, asset_id: uuid.UUID) -> list[AssetVersion]:
+        self.get_asset(asset_id)
+        return list(
+            self.session.scalars(
+                select(AssetVersion)
+                .where(AssetVersion.asset_id == asset_id, AssetVersion.is_deleted.is_(False))
+                .order_by(AssetVersion.version_number.desc())
+            )
+        )
+
+    def get_version(self, version_id: uuid.UUID) -> AssetVersion:
+        version = self.session.get(AssetVersion, version_id)
+        if version is None or version.is_deleted:
+            raise AssetNotFoundError(f"asset version {version_id} not found")
+        return version
+
+    def update_version_status(self, version_id: uuid.UUID, status: AssetStatus) -> AssetVersion:
+        version = self.get_version(version_id)
+        if version.asset.asset_type is AssetType.ORIGINAL:
+            raise AssetInvariantError("ORIGINAL versions are immutable")
+        allowed = {
+            AssetStatus.DRAFT: {AssetStatus.PROCESSING, AssetStatus.REVIEW},
+            AssetStatus.PROCESSING: {AssetStatus.REVIEW, AssetStatus.REJECTED},
+            AssetStatus.REVIEW: {
+                AssetStatus.PROCESSING,
+                AssetStatus.APPROVED,
+                AssetStatus.REJECTED,
+            },
+            AssetStatus.REJECTED: {AssetStatus.PROCESSING},
+            AssetStatus.APPROVED: set(),
+        }
+        if status is not version.status and status not in allowed[version.status]:
+            raise AssetInvariantError(
+                f"cannot transition asset version from {version.status} to {status}"
+            )
+        version.status = status
+        self.session.commit()
+        self.session.refresh(version)
+        return version
+
+    def delete_version(self, version_id: uuid.UUID) -> None:
+        version = self.get_version(version_id)
+        if version.asset.asset_type is AssetType.ORIGINAL:
+            raise AssetInvariantError("ORIGINAL versions cannot be deleted")
+        version.is_deleted = True
+        version.deleted_at = utc_now()
+        self.session.commit()
+
+    def download_version(self, version_id: uuid.UUID) -> tuple[AssetVersion, bytes]:
+        version = self.get_version(version_id)
+        return version, self.storage.get(version.object_key)
 
     def _store_version(
         self,
@@ -135,6 +213,7 @@ class AssetService:
         source_version_id: uuid.UUID | None = None,
         width: int | None = None,
         height: int | None = None,
+        status: AssetStatus = AssetStatus.DRAFT,
     ) -> AssetVersion:
         next_version = (
             self.session.scalar(
@@ -145,7 +224,8 @@ class AssetService:
             + 1
         )
         version_id = uuid.uuid4()
-        extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else "bin"
+        raw_extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else "bin"
+        extension = re.sub(r"[^a-z0-9]", "", raw_extension)[:10] or "bin"
         key = f"products/{asset.product_id}/assets/{asset.id}/versions/{version_id}.{extension}"
         checksum = hashlib.sha256(content).hexdigest()
         self.storage.put(key, content, mime_type)
@@ -161,6 +241,7 @@ class AssetService:
             height=height,
             checksum_sha256=checksum,
             source_version_id=source_version_id,
+            status=status,
         )
         self.session.add(version)
         self.session.flush()

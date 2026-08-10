@@ -1,0 +1,19 @@
+[
+  {
+    "platform": "temu",
+    "market": "*",
+    "category": "*",
+    "image_slot": "MAIN",
+    "rule_version": "1.0.0",
+    "effective_date": "2026-01-01",
+    "constraints": {
+      "min_width": 1000,
+      "min_height": 1000,
+      "aspect_ratios": ["1:1"],
+      "formats": ["image/jpeg", "image/png", "image/webp"],
+      "max_file_size_mb": 10,
+      "background": "white_or_neutral",
+      "watermark_policy": "forbidden"
+    }
+  }
+]

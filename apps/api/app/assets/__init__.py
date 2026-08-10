@@ -1,2 +1,1 @@
 """Immutable image asset domain."""
-
