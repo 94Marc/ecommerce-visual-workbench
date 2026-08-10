@@ -48,6 +48,9 @@ class Asset(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     sku_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("skus.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    asset_slot_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("asset_slots.id", ondelete="SET NULL"), nullable=True, unique=True
+    )
     asset_type: Mapped[AssetType] = mapped_column(Enum(AssetType), index=True)
     label: Mapped[str | None] = mapped_column(String(200), nullable=True)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)

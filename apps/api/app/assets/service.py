@@ -135,11 +135,24 @@ class AssetService:
         )
         return list(self.session.scalars(statement).unique())
 
-    def update_asset(self, asset_id: uuid.UUID, *, label: str | None) -> Asset:
+    def update_asset(
+        self, asset_id: uuid.UUID, *, label: str | None, asset_slot_id: uuid.UUID | None = None
+    ) -> Asset:
         asset = self.get_asset(asset_id)
         if asset.asset_type is AssetType.ORIGINAL:
             raise AssetInvariantError("ORIGINAL assets are immutable")
+        if asset_slot_id is not None:
+            from app.plans.models import AssetSlot
+
+            slot = self.session.get(AssetSlot, asset_slot_id)
+            if slot is None:
+                raise AssetNotFoundError(f"asset slot {asset_slot_id} not found")
+            if slot.image_type != asset.asset_type.value:
+                raise AssetInvariantError("asset type must match the selected asset slot")
+            if slot.plan.product_id != asset.product_id:
+                raise AssetInvariantError("asset slot belongs to a different product")
         asset.label = label
+        asset.asset_slot_id = asset_slot_id
         self.session.commit()
         return self.get_asset(asset_id)
 

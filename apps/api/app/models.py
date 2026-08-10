@@ -4,16 +4,23 @@ from app.assets.models import Asset, AssetVersion
 from app.catalog.models import SKU, Product
 from app.exports.models import ExportBundle
 from app.jobs.models import GenerationJob
+from app.plans.models import AssetSlot, ProductVisualPlan
 from app.reviews.models import Review
-from app.rules.models import PlatformRule
+from app.rules.models import Platform, PlatformCategory, PlatformMarket, PlatformRule, RuleVersion
 
 __all__ = [
     "Asset",
     "AssetVersion",
+    "AssetSlot",
     "ExportBundle",
     "GenerationJob",
     "PlatformRule",
+    "Platform",
+    "PlatformCategory",
+    "PlatformMarket",
     "Product",
+    "ProductVisualPlan",
     "Review",
     "SKU",
+    "RuleVersion",
 ]

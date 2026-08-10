@@ -124,7 +124,12 @@ def get_asset(asset_id: uuid.UUID, assets: AssetService = Depends(service)):
 @router.patch("/assets/{asset_id}", response_model=AssetRead)
 def update_asset(asset_id: uuid.UUID, data: AssetUpdate, assets: AssetService = Depends(service)):
     try:
-        return assets.update_asset(asset_id, label=data.label)
+        current_slot_id = (
+            data.asset_slot_id
+            if "asset_slot_id" in data.model_fields_set
+            else assets.get_asset(asset_id).asset_slot_id
+        )
+        return assets.update_asset(asset_id, label=data.label, asset_slot_id=current_slot_id)
     except AssetNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except AssetInvariantError as exc:

@@ -66,6 +66,64 @@ def test_semantic_rule_version_breaks_same_day_ties(session):
     assert resolved.id == latest.id
 
 
+def test_rule_creation_builds_platform_hierarchy(session):
+    rules = RuleService(session)
+    created = rules.create_rule(rule("1.0.0", date(2026, 1, 1)))
+    assert (created.platform, created.market, created.category) == ("temu", "US", "kitchen")
+    assert [item.code for item in rules.list_platforms()] == ["temu"]
+    assert [item.code for item in rules.list_markets()] == ["US"]
+    assert [item.code for item in rules.list_categories()] == ["kitchen"]
+
+
+def test_rule_validation_honors_text_and_watermark_policies(session):
+    rules = RuleService(session)
+    created = rules.create_rule(
+        rule("1.0.0", date(2026, 1, 1), text_allowed=False, watermark_allowed=False)
+    )
+    result = rules.validate_image(
+        created,
+        ImageProbe(
+            width=1000,
+            height=1000,
+            mime_type="image/jpeg",
+            byte_size=100,
+            has_text=True,
+            has_watermark=True,
+        ),
+    )
+    assert result.violations == ["text is not allowed", "watermark is not allowed"]
+
+
+def test_platform_rule_api_returns_flattened_version(client):
+    response = client.post(
+        "/api/v1/platform-rules",
+        json={
+            "platform": "amazon",
+            "market": "US",
+            "category": "home",
+            "image_slot": "MAIN",
+            "image_type": "MAIN",
+            "version": "1.2.0",
+            "effective_date": "2026-08-10",
+            "min_width": 2000,
+            "min_height": 2000,
+            "ratio": "1:1",
+            "max_size": 10485760,
+            "text_allowed": False,
+            "watermark_allowed": False,
+        },
+    )
+    assert response.status_code == 201
+    payload = response.json()
+    assert (payload["platform"], payload["market"], payload["category"]) == (
+        "amazon",
+        "US",
+        "home",
+    )
+    assert payload["version"] == "1.2.0"
+    assert client.get("/api/v1/platform-rules?platform=amazon").json()[0]["id"] == payload["id"]
+
+
 def test_all_platforms_have_registered_seed_frameworks():
     root = Path(__file__).parents[3]
     registry = json.loads((root / "platforms" / "registry.json").read_text(encoding="utf-8"))

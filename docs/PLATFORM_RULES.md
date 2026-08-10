@@ -2,17 +2,15 @@
 
 ## 统一规则结构
 
-每条规则必须含：`platform`、`market`、`category`、`image_slot`、`rule_version`、`effective_date`、`constraints`。解析时按平台、市场、类目、槽位过滤，选择生效日期不晚于目标日期且版本最高的启用规则。
+规则采用 Platform → PlatformMarket → PlatformCategory → PlatformRule → RuleVersion。扁平 API 命令仍接收 `platform`、`market`、`category`、`image_slot`、`image_type`、`version` 与 `effective_date`，服务会自动归入规范化层级。解析时先按精确市场/类目优先于 `*` 通配，再选择生效日期不晚于目标日期且语义版本最高的启用 RuleVersion。
 
-`constraints` 的标准键：
+RuleVersion 的标准字段：
 
-- `min_width` / `min_height` / `max_width` / `max_height`
-- `aspect_ratios`
-- `formats`
-- `max_file_size_mb`
-- `background`
-- `min_count` / `max_count`
-- `text_policy`、`watermark_policy`
+- `min_width` / `min_height`
+- `ratio`
+- `max_size`（字节）
+- `text_allowed` / `watermark_allowed`
+- `extra_constraints`（格式、背景等扩展策略）
 
 ## 平台注册表
 
@@ -25,4 +23,3 @@
 | AliExpress | `aliexpress` | 框架 | 规则数据 + 命名适配器 |
 
 平台规则会变化，仓库中的种子数据仅用于开发演示；生产发布前必须由运营确认来源和生效日期。
-

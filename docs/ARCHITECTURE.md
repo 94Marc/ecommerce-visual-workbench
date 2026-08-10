@@ -23,13 +23,14 @@ flowchart LR
 - `catalog`：Product、SKU 和属性。
 - `assets`：Asset 逻辑身份、不可变 AssetVersion、对象存储。
 - `rules`：版本化平台规则与确定性解析。
+- `plans`：商品视觉方案、图片数量与确定性 Asset Slot。
 - `jobs`：生成任务、状态机和 Worker 契约。
 - `reviews`：人工决策及重生成意图。
 - `exports`：已通过版本筛选、命名与 ZIP manifest。
 
 ## 3. 扩展策略
 
-平台差异通过规则数据和 `platforms/<platform>` 适配器表达。通用服务只使用 `PlatformCode`、`ImageSlot` 与解析后的约束，不出现 Temu 专用分支。真实 AI 接入只需替换 `GenerationProvider`，输入输出仍使用同一任务与资产版本契约。
+平台差异通过规范化的 Platform → Market → Category → Rule → RuleVersion 层级和 `platforms/<platform>` 数据表达。视觉方案固定 RuleVersion 后展开槽位，规则后续变更不会改变已创建方案。Phase 2 仍使用模拟 Provider，不接入 AI。
 
 ## 4. 一致性与可靠性
 
@@ -41,4 +42,3 @@ flowchart LR
 ## 5. 安全基线
 
 对象桶默认私有；下载使用短期签名 URL。上传校验 MIME、扩展名和尺寸上限。密钥只来自环境变量。V1 预留 workspace_id，正式多租户前补充行级授权。
-

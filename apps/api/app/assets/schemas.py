@@ -32,6 +32,7 @@ class AssetRead(BaseModel):
     id: uuid.UUID
     product_id: uuid.UUID
     sku_id: uuid.UUID | None
+    asset_slot_id: uuid.UUID | None
     asset_type: AssetType
     label: str | None
     is_archived: bool
@@ -42,6 +43,7 @@ class AssetRead(BaseModel):
 
 class AssetUpdate(BaseModel):
     label: str | None = Field(default=None, max_length=200)
+    asset_slot_id: uuid.UUID | None = None
 
 
 class AssetVersionUpdate(BaseModel):
