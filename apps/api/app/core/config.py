@@ -14,6 +14,14 @@ class Settings(BaseSettings):
     s3_secret_key: str = "workbench-secret"
     s3_bucket: str = "product-assets"
     s3_region: str = "us-east-1"
+    image_generation_provider: str = "mock"
+    image_generation_timeout_seconds: int = 120
+    image_generation_max_attempts: int = 3
+    image_generation_quality: str = "medium"
+    image_generation_output_format: str = "png"
+    openai_api_key: str | None = None
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_image_model: str = "gpt-image-2"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

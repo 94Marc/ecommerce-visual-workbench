@@ -1,4 +1,4 @@
-"""Minimal Redis consumer for the phase-1 mock generation provider."""
+"""Redis consumer for the environment-selected image generation provider."""
 
 import uuid
 

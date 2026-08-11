@@ -23,6 +23,13 @@ docs/       产品、架构、数据、平台规则与阶段计划
 4. 前端：`npm install`，然后 `npm run dev --workspace @ecommerce-visual-workbench/web`。
 5. 打开 `http://localhost:3000`，API 文档位于 `http://localhost:8000/docs`。
 
+## Phase 3 generation pipeline
+
+The generation pipeline supports an environment-selected OpenAI Image API provider, a free Mock
+fallback, versioned per-slot regeneration, retry/timeout persistence, pinned-rule validation,
+human review, and approved-only ZIP export. See
+[docs/PHASE3_GENERATION.md](docs/PHASE3_GENERATION.md) for configuration and operating steps.
+
 ## Phase 1 boundaries
 
 包含商品中心、不可变图片资产、平台规则、模拟生成任务、审核和 ZIP 导出。不包含订单、库存、采购、物流、客服、财务、广告和自动刊登。

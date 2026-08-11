@@ -27,7 +27,9 @@ jobs:
       - name: Lint backend
         run: python -m ruff check apps/api services
       - name: Test backend
-        run: python -m pytest apps/api/tests
+        run: python -m pytest
+      - name: Compile PostgreSQL migration SQL
+        run: alembic upgrade head --sql > migration.sql
 
   frontend:
     runs-on: ubuntu-latest
@@ -43,5 +45,7 @@ jobs:
         run: npm test
       - name: Lint frontend workspaces
         run: npm run lint
+      - name: Typecheck frontend workspaces
+        run: npm run typecheck
       - name: Build frontend
         run: npm run build
