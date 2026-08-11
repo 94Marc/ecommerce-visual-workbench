@@ -162,9 +162,7 @@ class GenerationWorker:
                 self._fail_job(job, exc.code, str(exc), exc.retryable)
                 return None
             except Exception as exc:
-                wrapped = ImageProviderError(
-                    str(exc), code="provider_error", retryable=False
-                )
+                wrapped = ImageProviderError(str(exc), code="provider_error", retryable=False)
                 self._record_attempt_failure(job, attempt, attempt_number, wrapped)
                 self._fail_job(job, wrapped.code, str(wrapped), wrapped.retryable)
                 return None
@@ -441,9 +439,7 @@ class GenerationWorker:
             return "1024x1536", 1024, 1536
         return "1024x1024", 1024, 1024
 
-    def _fail_job(
-        self, job: GenerationJob, code: str, message: str, retryable: bool
-    ) -> None:
+    def _fail_job(self, job: GenerationJob, code: str, message: str, retryable: bool) -> None:
         job.status = JobStatus.FAILED
         job.completed_at = utc_now()
         job.duration_ms = self._duration_ms(job.started_at, job.completed_at)

@@ -20,6 +20,9 @@ def test_phase_three_schema_contains_all_domain_tables():
         "workflow_definitions",
         "reviews",
         "export_bundles",
+        "templates",
+        "template_versions",
+        "template_render_records",
     }
     assert expected == set(Base.metadata.tables)
 

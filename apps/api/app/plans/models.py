@@ -44,4 +44,7 @@ class AssetSlot(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     image_type: Mapped[ImageSlot] = mapped_column(String(32), index=True)
     position: Mapped[int] = mapped_column(Integer)
     label: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    template_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("templates.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     plan: Mapped[ProductVisualPlan] = relationship(back_populates="slots")

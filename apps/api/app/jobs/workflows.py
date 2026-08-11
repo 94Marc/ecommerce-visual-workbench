@@ -15,8 +15,12 @@ DEFAULT_WORKFLOWS: tuple[dict[str, Any], ...] = (
         "provider": "comfyui",
         "workflow_file": "product_scene.v1.json",
         "default_parameters": {
-            "generation_mode": "BALANCED", "steps": 28, "cfg": 5.5, "denoise": 0.58,
-            "checkpoint": "sd_xl_base_1.0.safetensors", "filename_prefix": "product_scene",
+            "generation_mode": "BALANCED",
+            "steps": 28,
+            "cfg": 5.5,
+            "denoise": 0.58,
+            "checkpoint": "sd_xl_base_1.0.safetensors",
+            "filename_prefix": "product_scene",
         },
     },
     {
@@ -27,8 +31,12 @@ DEFAULT_WORKFLOWS: tuple[dict[str, Any], ...] = (
         "provider": "comfyui",
         "workflow_file": "product_usage.v1.json",
         "default_parameters": {
-            "generation_mode": "BALANCED", "steps": 28, "cfg": 5.5, "denoise": 0.52,
-            "checkpoint": "sd_xl_base_1.0.safetensors", "filename_prefix": "product_usage",
+            "generation_mode": "BALANCED",
+            "steps": 28,
+            "cfg": 5.5,
+            "denoise": 0.52,
+            "checkpoint": "sd_xl_base_1.0.safetensors",
+            "filename_prefix": "product_usage",
         },
     },
     {
@@ -39,8 +47,12 @@ DEFAULT_WORKFLOWS: tuple[dict[str, Any], ...] = (
         "provider": "comfyui",
         "workflow_file": "product_background.v1.json",
         "default_parameters": {
-            "generation_mode": "CREATIVE", "steps": 30, "cfg": 6.0, "denoise": 0.68,
-            "checkpoint": "sd_xl_base_1.0.safetensors", "filename_prefix": "product_background",
+            "generation_mode": "CREATIVE",
+            "steps": 30,
+            "cfg": 6.0,
+            "denoise": 0.68,
+            "checkpoint": "sd_xl_base_1.0.safetensors",
+            "filename_prefix": "product_background",
         },
     },
     {
@@ -51,8 +63,12 @@ DEFAULT_WORKFLOWS: tuple[dict[str, Any], ...] = (
         "provider": "comfyui",
         "workflow_file": "product_detail.v1.json",
         "default_parameters": {
-            "generation_mode": "STRICT", "steps": 24, "cfg": 4.5, "denoise": 0.28,
-            "checkpoint": "sd_xl_base_1.0.safetensors", "filename_prefix": "product_detail",
+            "generation_mode": "STRICT",
+            "steps": 24,
+            "cfg": 4.5,
+            "denoise": 0.28,
+            "checkpoint": "sd_xl_base_1.0.safetensors",
+            "filename_prefix": "product_detail",
         },
     },
     {
@@ -63,8 +79,12 @@ DEFAULT_WORKFLOWS: tuple[dict[str, Any], ...] = (
         "provider": "comfyui",
         "workflow_file": "product_main_white.v1.json",
         "default_parameters": {
-            "generation_mode": "STRICT", "steps": 24, "cfg": 4.0, "denoise": 0.22,
-            "checkpoint": "sd_xl_base_1.0.safetensors", "filename_prefix": "product_main_white",
+            "generation_mode": "STRICT",
+            "steps": 24,
+            "cfg": 4.0,
+            "denoise": 0.22,
+            "checkpoint": "sd_xl_base_1.0.safetensors",
+            "filename_prefix": "product_main_white",
         },
     },
 )

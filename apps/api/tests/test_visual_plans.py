@@ -7,6 +7,9 @@ from app.plans.service import VisualPlanService
 from app.rules.models import ImageSlot, PlatformCode
 from app.rules.schemas import PlatformRuleCreate
 from app.rules.service import RuleService
+from app.templates.models import TemplateStatus, TemplateType
+from app.templates.schemas import TemplateCreate
+from app.templates.service import TemplateService
 
 
 def context(session):
@@ -76,6 +79,40 @@ def test_visual_plan_update_rebuilds_slots(session):
     )
     assert updated.name == "Approved"
     assert [slot.code for slot in updated.slots] == ["MAIN_01"]
+
+
+def test_visual_plan_slot_can_bind_a_template(session):
+    template = TemplateService(session).create(
+        TemplateCreate(
+            name="White main",
+            code="PLAN_MAIN_01",
+            template_type=TemplateType.MAIN,
+            status=TemplateStatus.ACTIVE,
+            canvas_width=1600,
+            canvas_height=1600,
+            background={"color": "#ffffff"},
+            schema_json={
+                "schemaVersion": "1.0",
+                "layers": [
+                    {
+                        "id": "product",
+                        "type": "IMAGE",
+                        "assetSource": "{{asset.cutout}}",
+                        "width": 1200,
+                        "height": 1200,
+                    }
+                ],
+            },
+        )
+    )
+    slots = [
+        AssetSlotInput(code="MAIN_01", image_type=ImageSlot.MAIN, template_id=template.id),
+        AssetSlotInput(code="MAIN_02", image_type=ImageSlot.MAIN),
+        AssetSlotInput(code="DETAIL_FEATURE_01", image_type=ImageSlot.DETAIL),
+        AssetSlotInput(code="DIMENSION_FRONT", image_type=ImageSlot.DIMENSION),
+    ]
+    plan = make_plan(session, slots)
+    assert plan.slots[0].template_id == template.id
 
 
 def test_visual_plan_api_crud(client, session):

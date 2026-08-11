@@ -78,9 +78,7 @@ class BackgroundRemovalProvider(Protocol):
     name: str
     model: str
 
-    def remove_background(
-        self, request: ImageTransformationRequest
-    ) -> ImageGenerationResult: ...
+    def remove_background(self, request: ImageTransformationRequest) -> ImageGenerationResult: ...
 
 
 class ImageUpscaleProvider(Protocol):
@@ -262,9 +260,7 @@ class ComfyUIImageGenerationProvider:
             )
             _raise_for_response(response, self.name)
             prompt_id = str(response.json()["prompt_id"])
-            image_descriptor = self._wait_for_output(
-                base_url, prompt_id, request.timeout_seconds
-            )
+            image_descriptor = self._wait_for_output(base_url, prompt_id, request.timeout_seconds)
             image_response = self.client.get(
                 f"{base_url}/view",
                 params=image_descriptor,
@@ -386,9 +382,7 @@ class RembgBackgroundRemovalProvider:
         self.settings = settings or get_settings()
         self.backend = backend
 
-    def remove_background(
-        self, request: ImageTransformationRequest
-    ) -> ImageGenerationResult:
+    def remove_background(self, request: ImageTransformationRequest) -> ImageGenerationResult:
         if not self.settings.rembg_enabled:
             raise ProviderUnavailableError(self.name)
         backend = self.backend or self._load_backend()

@@ -8,7 +8,7 @@ import { loadVisualPlanCenter } from "@/lib/api";
 
 export default async function VisualPlansPage({searchParams}: {searchParams: Promise<{product?: string}>}) {
   const {product} = await searchParams;
-  const {products, platforms, rules, plans, demo} = await loadVisualPlanCenter(product);
+  const {products, platforms, rules, plans, templates, demo} = await loadVisualPlanCenter(product);
   return (
     <WorkspaceShell
       active="plan"
@@ -16,7 +16,7 @@ export default async function VisualPlansPage({searchParams}: {searchParams: Pro
       title="商品视觉方案"
       actions={<>{demo && <Badge className="border-amber-200 bg-amber-50 text-amber-700">演示数据</Badge>}<Button variant="secondary" asChild><Link href="/platform-rules"><ScrollText className="h-4 w-4" />查看平台规则</Link></Button></>}
     >
-      <VisualPlanBuilder products={products} platforms={platforms} rules={rules} initialPlans={plans} initialProductId={product} demo={demo} />
+      <VisualPlanBuilder products={products} platforms={platforms} rules={rules} templates={templates} initialPlans={plans} initialProductId={product} demo={demo} />
     </WorkspaceShell>
   );
 }

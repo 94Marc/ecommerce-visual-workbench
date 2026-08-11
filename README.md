@@ -39,6 +39,12 @@ workflows, task routing, immutable output versions and a product-workspace proce
 installation, environment settings and API operations are documented in
 [docs/PHASE4_PROVIDERS.md](docs/PHASE4_PROVIDERS.md).
 
+## Phase 5 deterministic template production
+
+Phase 5 adds versioned Template schemas, a Konva editor, deterministic Product/SKU data binding,
+APPROVED-only image selection, immutable REVIEW outputs, complete render traceability, and VisualPlan
+slot bindings. See [docs/TEMPLATE_SYSTEM.md](docs/TEMPLATE_SYSTEM.md).
+
 ## Phase 1 boundaries
 
 包含商品中心、不可变图片资产、平台规则、模拟生成任务、审核和 ZIP 导出。不包含订单、库存、采购、物流、客服、财务、广告和自动刊登。

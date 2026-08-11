@@ -109,9 +109,8 @@ class GenerationQualityEvaluator:
         output: ImageGenerationResult,
         references: tuple[ReferenceImage, ...],
     ) -> GenerationQualityResult:
-        resolution_valid = (
-            (rule.min_width is None or output.width >= rule.min_width)
-            and (rule.min_height is None or output.height >= rule.min_height)
+        resolution_valid = (rule.min_width is None or output.width >= rule.min_width) and (
+            rule.min_height is None or output.height >= rule.min_height
         )
         resolution = self._check(
             resolution_valid,

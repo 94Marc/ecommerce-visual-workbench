@@ -67,6 +67,14 @@ PlatformRule 唯一键为 `(category_id, image_slot, image_type)`。RuleVersion 
 
 记录平台上下文、object_key、manifest、checksum、status 与创建时间。manifest 固化实际文件名和版本 ID。
 
+### templates / template_versions
+
+Template 保存稳定 code、类型、状态和预览资产。TemplateVersion 以 `(template_id, version)` 唯一，固定画布、背景与 JSON Schema；历史版本无更新 API。
+
+### template_render_records
+
+固定 Template、TemplateVersion、GenerationJob、输出 AssetVersion、Product/SKU、全部来源 AssetVersion、商品数据快照与渲染时间。AssetSlot 可选绑定 Template，但每次实际渲染仍固定具体 TemplateVersion。
+
 ## 索引
 
 - Product：category；SKU：product_id、code。

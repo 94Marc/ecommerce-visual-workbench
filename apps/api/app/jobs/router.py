@@ -44,9 +44,7 @@ def create_job(data: GenerationJobCreate, jobs: JobService = Depends(service)):
 @router.post(
     "/from-plan", response_model=list[GenerationJobRead], status_code=status.HTTP_201_CREATED
 )
-def create_jobs_from_plan(
-    data: VisualPlanGenerationCreate, jobs: JobService = Depends(service)
-):
+def create_jobs_from_plan(data: VisualPlanGenerationCreate, jobs: JobService = Depends(service)):
     try:
         return jobs.create_plan_jobs(data)
     except (JobNotFoundError, RuleNotFoundError) as exc:
@@ -55,12 +53,8 @@ def create_jobs_from_plan(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
-@router.post(
-    "/tasks", response_model=GenerationJobRead, status_code=status.HTTP_201_CREATED
-)
-def create_processing_task(
-    data: ImageProcessingTaskCreate, jobs: JobService = Depends(service)
-):
+@router.post("/tasks", response_model=GenerationJobRead, status_code=status.HTTP_201_CREATED)
+def create_processing_task(data: ImageProcessingTaskCreate, jobs: JobService = Depends(service)):
     try:
         return jobs.create_processing_task(data)
     except (JobNotFoundError, RuleNotFoundError, WorkflowNotFoundError) as exc:

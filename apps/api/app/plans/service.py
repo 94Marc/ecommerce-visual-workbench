@@ -10,6 +10,7 @@ from app.catalog.models import Product
 from app.plans.models import AssetSlot, ProductVisualPlan
 from app.plans.schemas import AssetSlotInput, ProductVisualPlanCreate, ProductVisualPlanUpdate
 from app.rules.models import Platform, RuleVersion
+from app.templates.models import Template
 
 
 class VisualPlanNotFoundError(LookupError):
@@ -96,9 +97,17 @@ class VisualPlanService:
             for index in range(1, count + 1)
         ]
         for position, item in enumerate(inputs, start=1):
+            if item.template_id is not None:
+                template = self.session.get(Template, item.template_id)
+                if template is None:
+                    raise VisualPlanNotFoundError(f"template {item.template_id} not found")
             plan.slots.append(
                 AssetSlot(
-                    code=item.code, image_type=item.image_type, position=position, label=item.label
+                    code=item.code,
+                    image_type=item.image_type,
+                    position=position,
+                    label=item.label,
+                    template_id=item.template_id,
                 )
             )
 

@@ -107,7 +107,16 @@ export const taskTypes = [
   "GENERATE_DETAIL",
   "GENERATE_MAIN",
 ] as const;
-export type TaskType = (typeof taskTypes)[number];
+export const templateTaskTypes = [
+  "RENDER_MAIN_TEMPLATE",
+  "RENDER_DIMENSION_TEMPLATE",
+  "RENDER_DETAIL_TEMPLATE",
+  "RENDER_SELLING_POINT_TEMPLATE",
+  "RENDER_PARAMETER_TEMPLATE",
+  "RENDER_PACKAGE_TEMPLATE",
+  "RENDER_COMPARE_TEMPLATE",
+] as const;
+export type TaskType = (typeof taskTypes)[number] | (typeof templateTaskTypes)[number];
 
 export type WorkflowDefinition = {
   id: string;
@@ -156,7 +165,7 @@ export type PlatformRuleVersion = {
   min_width: number | null; min_height: number | null; ratio: string | null; max_size: number | null;
   text_allowed: boolean; watermark_allowed: boolean; enabled: boolean;
 };
-export type AssetSlot = {id: string; code: string; image_type: string; position: number; label: string | null};
+export type AssetSlot = {id: string; code: string; image_type: string; position: number; label: string | null; template_id?: string | null};
 export type ProductVisualPlan = {
   id: string; product_id: string; platform_id: string; rule_version_id: string; name: string;
   market: string; category: string; requested_outputs: Record<string, number>; slots: AssetSlot[]; created_at: string;
@@ -193,6 +202,57 @@ export const demoVisualPlans: ProductVisualPlan[] = [{
 export const demoWorkflows: WorkflowDefinition[] = [
   {id: "workflow-main", name: "product_main_white", version: "1.0.0", task_type: "GENERATE_MAIN", provider: "comfyui", workflow_file: "product_main_white.v1.json", default_parameters: {generation_mode: "STRICT"}, active: true},
   {id: "workflow-scene", name: "product_scene", version: "1.0.0", task_type: "GENERATE_SCENE", provider: "comfyui", workflow_file: "product_scene.v1.json", default_parameters: {generation_mode: "BALANCED"}, active: true},
+];
+
+function demoTemplate(
+  id: string,
+  code: string,
+  name: string,
+  templateType: EcommerceTemplate["template_type"],
+  layers: TemplateDocument["layers"],
+): EcommerceTemplate {
+  const timestamp = "2026-08-11T00:00:00Z";
+  const version: TemplateVersion = {
+    id: `${id}-v1`, template_id: id, version: 1, canvas_width: 1600, canvas_height: 1600,
+    background: {color: "#ffffff"}, schema_json: {schemaVersion: "1.0", layers},
+    created_at: timestamp, updated_at: timestamp,
+  };
+  return {id, code, name, template_type: templateType, status: "ACTIVE", preview_asset_id: null, versions: [version], latest_version: version, created_at: timestamp, updated_at: timestamp};
+}
+
+const productLayer = {
+  id: "product", type: "IMAGE" as const, x: 240, y: 190, width: 1120, height: 1040,
+  rotation: 0, opacity: 1, visible: true, locked: false, zIndex: 1,
+  assetSource: "{{asset.cutout}}" as const, fit: "contain" as const,
+};
+const titleLayer = {
+  id: "title", type: "TEXT" as const, x: 160, y: 90, width: 1280, height: 80,
+  rotation: 0, opacity: 1, visible: true, locked: false, zIndex: 3,
+  text: "{{product.name}}", fontSize: 48, fontFamily: "Arial", fontWeight: "bold" as const,
+  align: "center" as const, lineHeight: 1.2, fill: "#172033",
+};
+
+export const demoTemplates: EcommerceTemplate[] = [
+  demoTemplate("template-main-white", "MAIN_WHITE_01", "白底主图", "MAIN", [productLayer]),
+  demoTemplate("template-dimension", "DIMENSION_BASIC_01", "基础长宽尺寸图", "DIMENSION", [
+    productLayer,
+    {...titleLayer, id: "length", y: 1320, text: "← {{product.length}} →", fontSize: 38},
+    {id: "width-line", type: "LINE", x: 250, y: 1280, width: 1100, height: 0, rotation: 0, opacity: 1, visible: true, locked: false, zIndex: 2, points: [0, 0, 1100, 0], stroke: "#172033", strokeWidth: 3, arrowStart: true, arrowEnd: true},
+  ]),
+  demoTemplate("template-selling", "SELLING_POINT_01", "三个核心卖点", "SELLING_POINT", [
+    {...productLayer, width: 850, x: 650}, titleLayer,
+    ...[1, 2, 3].map((index) => ({id: `point-${index}`, type: "TEXT" as const, x: 130, y: 430 + index * 180, width: 500, height: 100, rotation: 0, opacity: 1, visible: true, locked: false, zIndex: 3, text: `0${index}  {{selling_point_${index}}}`, fontSize: 34, fontFamily: "Arial", fontWeight: "bold" as const, align: "left" as const, lineHeight: 1.2, fill: "#172033"})),
+  ]),
+  demoTemplate("template-parameter", "PARAMETER_01", "产品参数展示", "PARAMETER", [
+    {...productLayer, width: 720, height: 760, x: 800, y: 330}, titleLayer,
+    {...titleLayer, id: "params", x: 140, y: 500, width: 560, height: 500, text: "材质  {{product.material}}\n颜色  {{product.color}}\n尺寸  {{product.length}} × {{product.width}} × {{product.height}}\n重量  {{product.weight}}", fontSize: 32, fontWeight: "normal", align: "left", lineHeight: 2},
+  ]),
+  demoTemplate("template-package", "PACKAGE_01", "商品与包装展示", "PACKAGE", [
+    {...productLayer, width: 720, x: 90}, {...productLayer, id: "package", x: 790, width: 720, assetSource: "{{asset.package}}"}, titleLayer,
+  ]),
+  demoTemplate("template-detail", "DETAIL_CLOSEUP_01", "细节特写", "DETAIL", [
+    {...productLayer, id: "closeup", x: 130, y: 230, width: 1340, height: 1080, assetSource: "{{asset.closeup}}", fit: "cover"}, titleLayer,
+  ]),
 ];
 
 export const demoProducts: Product[] = [
@@ -371,12 +431,65 @@ export async function loadPlatformRuleCenter() {
 }
 
 export async function loadVisualPlanCenter(productId?: string) {
-  const [products, platforms, rules, plans] = await Promise.all([
+  const [products, platforms, rules, plans, templates] = await Promise.all([
     read<Product[]>("/products", demoProducts), read<Platform[]>("/platform-rules/platforms", demoPlatforms),
     read<PlatformRuleVersion[]>("/platform-rules", demoRules),
     read<ProductVisualPlan[]>(`/visual-plans${productId ? `?product_id=${productId}` : ""}`, demoVisualPlans),
+    read<EcommerceTemplate[]>("/templates?status=ACTIVE", demoTemplates),
   ]);
-  return {products, platforms, rules, plans, demo: plans === demoVisualPlans};
+  return {products, platforms, rules, plans, templates, demo: plans === demoVisualPlans};
+}
+
+export async function loadTemplateCenter() {
+  const [templates, products] = await Promise.all([
+    read<EcommerceTemplate[]>("/templates", demoTemplates),
+    read<Product[]>("/products", demoProducts),
+  ]);
+  return {templates, products, demo: templates === demoTemplates};
+}
+
+export async function loadTemplateEditor(templateId: string) {
+  const fallback = demoTemplates.find((template) => template.id === templateId) ?? demoTemplates[0];
+  const [template, products] = await Promise.all([
+    templateId.startsWith("template-") ? Promise.resolve(fallback) : read<EcommerceTemplate>(`/templates/${templateId}`, fallback),
+    read<Product[]>("/products", demoProducts),
+  ]);
+  const product = products[0];
+  const assets = product
+    ? product.id.startsWith("demo-")
+      ? demoAssets
+      : await read<Asset[]>(`/products/${product.id}/assets`, [])
+    : [];
+  return {template, products, assets, demo: template === fallback};
+}
+
+async function write<T>(path: string, method: string, payload: unknown): Promise<T> {
+  const response = await fetch(`${apiUrl}${path}`, {
+    method,
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as {detail?: string};
+    throw new Error(body.detail ?? "模板操作失败");
+  }
+  return response.json() as Promise<T>;
+}
+
+export function saveTemplateVersion(templateId: string, payload: Omit<TemplateVersion, "id" | "template_id" | "version" | "created_at" | "updated_at">) {
+  return write<TemplateVersion>(`/templates/${templateId}/versions`, "POST", payload);
+}
+
+export function updateTemplate(templateId: string, payload: {name?: string; status?: TemplateStatus}) {
+  return write<EcommerceTemplate>(`/templates/${templateId}`, "PATCH", payload);
+}
+
+export function copyTemplate(templateId: string, code: string, name?: string) {
+  return write<EcommerceTemplate>(`/templates/${templateId}/copy`, "POST", {code, name});
+}
+
+export function renderTemplate(payload: {template_version_id: string; product_id: string; sku_id?: string; asset_slot_id?: string; output_format?: "PNG" | "JPEG"}) {
+  return write<{job_id: string; output_asset_version_id: string}>("/templates/renders", "POST", payload);
 }
 
 export function assetContentUrl(versionId: string) {
@@ -408,3 +521,9 @@ export function summarizeJobs(jobs: GenerationJob[]) {
     {pending: 0, processing: 0, completed: 0, failed: 0},
   );
 }
+import type {
+  EcommerceTemplate,
+  TemplateDocument,
+  TemplateStatus,
+  TemplateVersion,
+} from "@ecommerce-visual-workbench/templates";

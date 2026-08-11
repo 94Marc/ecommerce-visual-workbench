@@ -31,7 +31,11 @@
 
 接入 rembg、Real-ESRGAN 与独立 ComfyUI HTTP 服务；增加 Workflow Registry、统一任务路由、处理输出元数据和商品工作区处理工位。真实 Provider 未配置时明确失败，不以 mock 冒充。
 
-## Phase 5 — 团队化与规模化
+## Phase 5 — 电商图片模板生产系统
+
+增加版本化 Template/TemplateVersion、Konva 编辑器、Product/SKU 动态绑定、确定性尺寸图、APPROVED-only 图片选择、模板任务、AssetVersion 追踪和 VisualPlan 槽位模板绑定。不新增 AI Provider。
+
+## Phase 6 — 团队化与规模化
 
 多租户权限、配额、审计、版本发布、成本治理和高可用部署。
 

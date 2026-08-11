@@ -8,6 +8,7 @@ from app.jobs.models import (
     AttemptStatus,
     GenerationMode,
     JobStatus,
+    ProviderType,
     TaskType,
     UpscaleMode,
     ValidationStatus,
@@ -89,6 +90,7 @@ class GenerationJobRead(GenerationJobCreate):
     output_version_id: uuid.UUID | None
     status: JobStatus
     provider: str
+    provider_type: ProviderType
     provider_model: str | None
     provider_request_id: str | None
     prompt: str

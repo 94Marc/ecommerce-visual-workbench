@@ -20,6 +20,7 @@ class AssetSlotInput(BaseModel):
     code: str = Field(pattern=r"^[A-Z][A-Z0-9_]{2,79}$")
     image_type: ImageSlot
     label: str | None = Field(default=None, max_length=160)
+    template_id: uuid.UUID | None = None
 
     @field_validator("image_type")
     @classmethod
@@ -85,6 +86,7 @@ class AssetSlotRead(BaseModel):
     image_type: ImageSlot
     position: int
     label: str | None
+    template_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 

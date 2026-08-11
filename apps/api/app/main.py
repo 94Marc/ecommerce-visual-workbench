@@ -9,6 +9,7 @@ from app.jobs.router import router as jobs_router
 from app.plans.router import router as plans_router
 from app.reviews.router import router as reviews_router
 from app.rules.router import router as rules_router
+from app.templates.router import router as templates_router
 
 
 def create_app() -> FastAPI:
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(jobs_router, prefix=settings.api_prefix)
     app.include_router(reviews_router, prefix=settings.api_prefix)
     app.include_router(exports_router, prefix=settings.api_prefix)
+    app.include_router(templates_router, prefix=settings.api_prefix)
     return app
 
 

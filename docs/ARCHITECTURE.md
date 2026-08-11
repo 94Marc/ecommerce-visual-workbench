@@ -27,6 +27,7 @@ flowchart LR
 - `jobs`：统一图片任务、Workflow Registry、状态机、Provider 路由和 Worker 契约。
 - `reviews`：人工决策及重生成意图。
 - `exports`：已通过版本筛选、命名与 ZIP manifest。
+- `templates`：Template/TemplateVersion、Schema 校验、真实数据绑定、确定性渲染与来源追踪。
 
 ## 3. 扩展策略
 
@@ -40,6 +41,7 @@ flowchart LR
 - 导出由确定的审核通过版本集合生成，并记录校验和。
 - 去背景、增强和生成都只追加 AssetVersion；转换任务允许没有平台规则，生成任务仍必须固定 RuleVersion。
 - ComfyUI 作为独立 HTTP 服务运行；主应用只加载已注册的 API workflow 文件，不嵌入 ComfyUI 运行时。
+- 模板任务复用 GenerationJob，但以 `provider_type=TEMPLATE` 区分；服务端解释 Konva Schema，并始终追加 REVIEW AssetVersion。
 
 ## 5. 安全基线
 

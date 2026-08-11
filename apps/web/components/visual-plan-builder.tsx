@@ -1,5 +1,6 @@
 "use client";
 
+import type {EcommerceTemplate} from "@ecommerce-visual-workbench/templates";
 import { Badge, Button, Card, cn } from "@ecommerce-visual-workbench/ui";
 import { CheckCircle2, ClipboardList, Minus, Plus, Save, Target } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -28,6 +29,7 @@ export function VisualPlanBuilder({
   products,
   platforms,
   rules,
+  templates,
   initialPlans,
   initialProductId,
   demo,
@@ -35,6 +37,7 @@ export function VisualPlanBuilder({
   products: Product[];
   platforms: Platform[];
   rules: PlatformRuleVersion[];
+  templates: EcommerceTemplate[];
   initialPlans: ProductVisualPlan[];
   initialProductId?: string;
   demo: boolean;
@@ -44,6 +47,13 @@ export function VisualPlanBuilder({
   const [platformId, setPlatformId] = useState(platforms[0]?.id ?? "");
   const [counts, setCounts] = useState<Record<(typeof types)[number], number>>(defaults);
   const [message, setMessage] = useState<string | null>(null);
+  const [templateBindings, setTemplateBindings] = useState<Record<string, string>>(() => ({
+    MAIN: templates.find((item) => item.code === "MAIN_WHITE_01")?.id ?? "",
+    DETAIL: templates.find((item) => item.code === "SELLING_POINT_01")?.id ?? "",
+    DIMENSION: templates.find((item) => item.code === "DIMENSION_BASIC_01")?.id ?? "",
+    PACKAGE: templates.find((item) => item.code === "PACKAGE_01")?.id ?? "",
+    CLOSEUP: templates.find((item) => item.code === "DETAIL_CLOSEUP_01")?.id ?? "",
+  }));
   const platform = platforms.find((item) => item.id === platformId) ?? platforms[0];
   const eligibleRules = rules.filter((rule) => rule.platform === platform?.code);
   const [ruleVersionId, setRuleVersionId] = useState(rules[0]?.id ?? "");
@@ -73,12 +83,19 @@ export function VisualPlanBuilder({
       market: selectedRule.market,
       category: product?.category ?? selectedRule.category,
       requested_outputs,
+      slots: preview.map((slot, index) => ({
+        code: slot.code,
+        image_type: slot.type,
+        label: null,
+        template_id: templateBindings[slot.type] || null,
+        position: index + 1,
+      })),
     };
     if (demo) {
       setPlans((current) => [{
         ...payload,
         id: `local-plan-${Date.now()}`,
-        slots: preview.map((slot, index) => ({id: `local-slot-${index}`, code: slot.code, image_type: slot.type, position: index + 1, label: null})),
+        slots: preview.map((slot, index) => ({id: `local-slot-${index}`, code: slot.code, image_type: slot.type, position: index + 1, label: null, template_id: templateBindings[slot.type] || null})),
         created_at: new Date().toISOString(),
       }, ...current]);
       setMessage("演示方案已生成；连接 API 后会固定到所选规则版本。 ");
@@ -130,6 +147,13 @@ export function VisualPlanBuilder({
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e3e7ee] p-5"><p className="text-xs text-[#738094]">数量变更会重新展开槽位；不会创建图片，也不会调用 AI。</p><Button onClick={savePlan}><Save className="h-4 w-4" />保存视觉方案</Button></div>
         </Card>
       </section>
+
+      <Card className="p-0">
+        <div className="border-b border-[#e3e7ee] p-5"><p className="utility-face text-[10px] tracking-[.14em] text-[#8a94a6]">TEMPLATE ROUTING</p><h2 className="display-face mt-1 text-xl font-bold">槽位模板绑定</h2><p className="mt-1 text-xs text-[#7c8799]">方案保存模板 ID；实际渲染仍固定到当时选择的 TemplateVersion。</p></div>
+        <div className="grid gap-px bg-[#e3e7ee] sm:grid-cols-2 lg:grid-cols-4">
+          {types.map((type) => <label key={type} className="grid gap-2 bg-white p-4 text-xs font-bold"><span>{type} · {labels[type]}</span><select className="rounded-lg border border-[#d7dde7] bg-white p-2 font-normal" value={templateBindings[type] ?? ""} onChange={(event) => setTemplateBindings((current) => ({...current, [type]: event.target.value}))}><option value="">不绑定模板</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.code}</option>)}</select></label>)}
+        </div>
+      </Card>
 
       <section className="grid gap-5 xl:grid-cols-[1fr_420px]">
         <Card className="overflow-hidden p-0">

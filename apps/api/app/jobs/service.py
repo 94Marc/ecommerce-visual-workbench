@@ -12,6 +12,7 @@ from app.jobs.models import (
     GenerationJob,
     GenerationMode,
     JobStatus,
+    ProviderType,
     TaskType,
     ValidationStatus,
 )
@@ -94,6 +95,7 @@ class JobService:
                 status=JobStatus.PENDING,
                 parameters=parameters,
                 provider=provider_name,
+                provider_type=ProviderType.IMAGE_PROCESSING,
                 provider_model=provider_model,
                 prompt=data.prompt or self._processing_prompt(data.task_type),
                 negative_prompt=data.negative_prompt,
@@ -331,6 +333,7 @@ class JobService:
             negative_prompt=parent.negative_prompt,
             seed=parent.seed,
             provider=provider_name,
+            provider_type=parent.provider_type,
             provider_model=provider_model,
             max_attempts=get_settings().image_generation_max_attempts,
             timeout_seconds=get_settings().image_generation_timeout_seconds,
@@ -371,6 +374,7 @@ class JobService:
             resolved_rule_id=rule.id,
             status=JobStatus.PENDING,
             provider=provider_name,
+            provider_type=ProviderType.AI,
             provider_model=provider_model,
             prompt=prompt,
             max_attempts=settings.image_generation_max_attempts,
@@ -418,14 +422,14 @@ class JobService:
             return self._get_original_references(requested, plan.product_id)
         references = list(
             self.session.scalars(
-            select(AssetVersion)
-            .join(Asset, AssetVersion.asset_id == Asset.id)
-            .where(
-                Asset.product_id == plan.product_id,
-                Asset.asset_type == AssetType.ORIGINAL,
-                Asset.is_archived.is_(False),
-                AssetVersion.is_deleted.is_(False),
-            )
+                select(AssetVersion)
+                .join(Asset, AssetVersion.asset_id == Asset.id)
+                .where(
+                    Asset.product_id == plan.product_id,
+                    Asset.asset_type == AssetType.ORIGINAL,
+                    Asset.is_archived.is_(False),
+                    AssetVersion.is_deleted.is_(False),
+                )
                 .order_by(Asset.created_at, AssetVersion.created_at.desc())
                 .limit(10)
             )
@@ -454,9 +458,7 @@ class JobService:
         return references
 
     @staticmethod
-    def _select_slots(
-        plan: ProductVisualPlan, slot_ids: list[uuid.UUID] | None
-    ) -> list[AssetSlot]:
+    def _select_slots(plan: ProductVisualPlan, slot_ids: list[uuid.UUID] | None) -> list[AssetSlot]:
         if slot_ids is None:
             return list(plan.slots)
         requested = set(slot_ids)

@@ -12,6 +12,7 @@ from app.jobs.models import (
 from app.plans.models import AssetSlot, ProductVisualPlan
 from app.reviews.models import Review
 from app.rules.models import Platform, PlatformCategory, PlatformMarket, PlatformRule, RuleVersion
+from app.templates.models import Template, TemplateRenderRecord, TemplateVersion
 
 __all__ = [
     "Asset",
@@ -30,5 +31,8 @@ __all__ = [
     "ProductVisualPlan",
     "Review",
     "SKU",
+    "Template",
+    "TemplateRenderRecord",
+    "TemplateVersion",
     "RuleVersion",
 ]

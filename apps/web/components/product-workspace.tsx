@@ -9,6 +9,7 @@ import {
   History,
   ImagePlus,
   LockKeyhole,
+  Layers3,
   Maximize2,
   PackagePlus,
   Ruler,
@@ -228,7 +229,7 @@ export function ProductWorkspace({
       <section className="grid gap-5 xl:grid-cols-[1fr_460px]">
         <Card className="overflow-hidden p-0">
           <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#e1e6ed] px-5 py-5 lg:px-6">
-            <div>
+            <div className="flex flex-wrap gap-2">
               <p className="utility-face text-[10px] tracking-[.14em] text-[#8a94a6]">IMAGE PROCESSING DOCK</p>
               <h2 className="display-face mt-1 text-2xl font-bold">图片处理工位</h2>
               <p className="mt-1 text-sm text-[#778296]">先选资产，再选择真实处理路线；不可用的 Provider 会明确失败。</p>
@@ -322,6 +323,7 @@ export function ProductWorkspace({
                   if (file) void uploadOriginal(file);
                 }}
               />
+              <Button variant="secondary" asChild><Link href={`/templates?product=${product.id}&type=${filter === "ALL" ? "MAIN" : filter}`}><Layers3 className="h-4 w-4" />使用模板生成</Link></Button>
               <Button onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" />上传供应商原图</Button>
             </div>
           </div>

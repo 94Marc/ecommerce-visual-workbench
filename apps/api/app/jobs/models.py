@@ -58,10 +58,27 @@ class TaskType(StrEnum):
     GENERATE_BACKGROUND = "GENERATE_BACKGROUND"
     GENERATE_DETAIL = "GENERATE_DETAIL"
     GENERATE_MAIN = "GENERATE_MAIN"
+    RENDER_MAIN_TEMPLATE = "RENDER_MAIN_TEMPLATE"
+    RENDER_DIMENSION_TEMPLATE = "RENDER_DIMENSION_TEMPLATE"
+    RENDER_DETAIL_TEMPLATE = "RENDER_DETAIL_TEMPLATE"
+    RENDER_SELLING_POINT_TEMPLATE = "RENDER_SELLING_POINT_TEMPLATE"
+    RENDER_PARAMETER_TEMPLATE = "RENDER_PARAMETER_TEMPLATE"
+    RENDER_PACKAGE_TEMPLATE = "RENDER_PACKAGE_TEMPLATE"
+    RENDER_COMPARE_TEMPLATE = "RENDER_COMPARE_TEMPLATE"
 
     @property
     def is_generation(self) -> bool:
         return self.value.startswith("GENERATE_")
+
+    @property
+    def is_template(self) -> bool:
+        return self.value.startswith("RENDER_")
+
+
+class ProviderType(StrEnum):
+    AI = "AI"
+    IMAGE_PROCESSING = "IMAGE_PROCESSING"
+    TEMPLATE = "TEMPLATE"
 
 
 class UpscaleMode(StrEnum):
@@ -125,6 +142,9 @@ class GenerationJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     parameters: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     provider: Mapped[str] = mapped_column(String(32), default="mock")
+    provider_type: Mapped[ProviderType] = mapped_column(
+        Enum(ProviderType), default=ProviderType.AI, index=True
+    )
     provider_model: Mapped[str | None] = mapped_column(String(120), nullable=True)
     provider_request_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
     prompt: Mapped[str] = mapped_column(Text, default="")

@@ -11,6 +11,7 @@ import {
   rejectReasons,
   summarizeJobs,
   taskTypes,
+  templateTaskTypes,
   type GenerationJob,
 } from "./api";
 
@@ -85,5 +86,12 @@ describe("phase 4 real provider routing", () => {
     expect(demoWorkflows.find((workflow) => workflow.name === "product_main_white")?.provider).toBe("comfyui");
     expect(demoJobs[0].workflow_definition_id).toBe("workflow-main");
     expect(demoJobs[0].output_metadata).toMatchObject({output_width: 1600, mime_type: "image/png"});
+  });
+});
+
+describe("phase 5 template tasks", () => {
+  it("uses the unified task record for every deterministic render type", () => {
+    expect(templateTaskTypes).toHaveLength(7);
+    expect(templateTaskTypes).toContain("RENDER_DIMENSION_TEMPLATE");
   });
 });

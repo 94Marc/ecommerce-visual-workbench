@@ -4,10 +4,13 @@
   "private": true,
   "type": "module",
   "exports": {".": "./src/index.tsx"},
+  "scripts": {"test": "vitest run"},
   "dependencies": {
+    "@ecommerce-visual-workbench/templates": "*",
     "konva": "^9.3.18",
     "react": "^19.0.0",
     "react-konva": "^19.0.3"
   },
-  "peerDependencies": {"react": "^19.0.0", "react-dom": "^19.0.0"}
+  "peerDependencies": {"react": "^19.0.0", "react-dom": "^19.0.0"},
+  "devDependencies": {"vitest": "^2.1.8"}
 }
