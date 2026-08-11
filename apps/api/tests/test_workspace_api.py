@@ -1,8 +1,11 @@
 from datetime import date
+from pathlib import Path
 
 from app.rules.models import ImageSlot, PlatformCode
 from app.rules.schemas import PlatformRuleCreate
 from app.rules.service import RuleService
+
+REAL_CLOTH = (Path(__file__).parent / "fixtures" / "gray_cleaning_cloth_original.png").read_bytes()
 
 
 def create_product_and_original(client):
@@ -12,7 +15,7 @@ def create_product_and_original(client):
     ).json()
     original = client.post(
         f"/api/v1/products/{product['id']}/assets/original",
-        files={"file": ("supplier.jpg", b"supplier-bytes", "image/jpeg")},
+        files={"file": ("supplier.png", REAL_CLOTH, "image/png")},
     ).json()
     return product, original
 
@@ -28,7 +31,7 @@ def test_asset_and_version_crud_api(client):
             "source_version_id": source_id,
             "label": "Detail crop",
         },
-        files={"file": ("detail.jpg", b"detail-v1", "image/jpeg")},
+        files={"file": ("detail.png", REAL_CLOTH, "image/png")},
     )
     assert derived_response.status_code == 201
     derived = derived_response.json()
@@ -42,7 +45,7 @@ def test_asset_and_version_crud_api(client):
     next_version = client.post(
         f"/api/v1/assets/{derived['id']}/versions",
         data={"source_version_id": version_id},
-        files={"file": ("detail-v2.jpg", b"detail-v2", "image/jpeg")},
+        files={"file": ("detail-v2.png", REAL_CLOTH, "image/png")},
     )
     assert next_version.status_code == 201
     assert next_version.json()["version_number"] == 2
@@ -57,7 +60,7 @@ def test_asset_and_version_crud_api(client):
 
     content = client.get(f"/api/v1/asset-versions/{version_id}/content")
     assert content.status_code == 200
-    assert content.content == b"detail-v1"
+    assert content.content == REAL_CLOTH
 
     assert client.delete(f"/api/v1/assets/{original['id']}").status_code == 409
     assert client.delete(f"/api/v1/assets/{derived['id']}").status_code == 204

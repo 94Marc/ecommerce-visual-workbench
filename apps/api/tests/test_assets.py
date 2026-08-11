@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from app.assets.models import AssetStatus, AssetType
 from app.assets.service import AssetInvariantError, AssetService
@@ -6,6 +8,8 @@ from app.catalog.service import CatalogService
 
 from tests.conftest import MemoryObjectStorage
 
+REAL_CLOTH = (Path(__file__).parent / "fixtures" / "gray_cleaning_cloth_original.png").read_bytes()
+
 
 def test_original_upload_creates_immutable_first_version(client):
     product = client.post(
@@ -13,7 +17,7 @@ def test_original_upload_creates_immutable_first_version(client):
     ).json()
     response = client.post(
         f"/api/v1/products/{product['id']}/assets/original",
-        files={"file": ("supplier.jpg", b"supplier-original", "image/jpeg")},
+        files={"file": ("supplier.png", REAL_CLOTH, "image/png")},
         data={"label": "front view"},
     )
 
@@ -23,6 +27,9 @@ def test_original_upload_creates_immutable_first_version(client):
     assert len(asset["versions"]) == 1
     assert asset["versions"][0]["version_number"] == 1
     assert asset["versions"][0]["checksum_sha256"]
+    assert asset["versions"][0]["width"] == 1254
+    assert asset["versions"][0]["height"] == 1254
+    assert asset["versions"][0]["mime_type"] == "image/png"
 
 
 def test_processing_creates_new_asset_and_version(session):

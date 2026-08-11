@@ -1,3 +1,6 @@
+import importlib
+import json
+
 from app.core.database import Base
 
 
@@ -90,3 +93,17 @@ def test_processing_tasks_allow_no_platform_rule_but_pin_workflows():
     assert table.c.workflow_definition_id.nullable is True
     targets = {foreign_key.target_fullname for foreign_key in table.foreign_keys}
     assert "workflow_definitions.id" in targets
+
+
+def test_workflow_seed_json_escapes_sqlalchemy_bind_markers():
+    migration = importlib.import_module(
+        "apps.api.alembic.versions.0005_real_image_processing_providers"
+    )
+    for _, _, _, _, parameters in migration.WORKFLOWS:
+        payload = (
+            json.dumps(parameters, separators=(",", ":"))
+            .replace("'", "''")
+            .replace(":", r"\:")
+        )
+        assert r'"steps"\:' in payload
+        assert '"steps":' not in payload

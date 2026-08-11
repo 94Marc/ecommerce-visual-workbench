@@ -82,7 +82,11 @@ def upgrade() -> None:
     op.create_index("ix_workflow_definitions_active", "workflow_definitions", ["active"])
 
     for workflow_id, name, workflow_task, workflow_file, parameters in WORKFLOWS:
-        payload = json.dumps(parameters, separators=(",", ":")).replace("'", "''")
+        payload = (
+            json.dumps(parameters, separators=(",", ":"))
+            .replace("'", "''")
+            .replace(":", r"\:")
+        )
         op.execute(
             "INSERT INTO workflow_definitions "
             "(id,name,version,task_type,provider,workflow_file,default_parameters,"

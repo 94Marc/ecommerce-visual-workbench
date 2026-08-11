@@ -121,7 +121,7 @@ class TemplateBindingResolver:
             "{{asset.cutout}}": [AssetType.CUTOUT, AssetType.MAIN],
             "{{asset.main}}": [AssetType.MAIN, AssetType.CUTOUT],
             "{{asset.closeup}}": [AssetType.CLOSEUP, AssetType.CUTOUT, AssetType.MAIN],
-            "{{asset.package}}": [AssetType.PACKAGE, AssetType.CUTOUT, AssetType.MAIN],
+            "{{asset.package}}": [AssetType.PACKAGE],
         }
         for source in requested_sources:
             if source in result:

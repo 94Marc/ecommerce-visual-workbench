@@ -23,6 +23,9 @@ from app.jobs.models import (
     ValidationStatus,
 )
 from app.plans.models import AssetSlot
+from app.rules.models import ImageSlot, Platform, PlatformCode, RuleVersion
+from app.rules.schemas import ImageProbe
+from app.rules.service import RuleNotFoundError, RuleService
 from app.templates.bindings import TemplateBindingError, TemplateBindingResolver
 from app.templates.demos import DEMO_TEMPLATES
 from app.templates.models import (
@@ -236,6 +239,7 @@ class TemplateRenderService:
         if sku is not None and sku.product_id != product.id:
             raise TemplateInvariantError("SKU must belong to the rendered product")
         document = TemplateDocument.model_validate(version.schema_json)
+        slot, platform, rule, rule_warning = self._platform_context(data)
         sources = self._image_sources(document.layers)
         assets = self.bindings.approved_assets(product.id, sources, data.asset_bindings)
         if not assets:
@@ -247,8 +251,13 @@ class TemplateRenderService:
         started_at = utc_now()
         job = GenerationJob(
             source_version_id=source.id,
-            resolved_rule_id=None,
+            resolved_rule_id=rule.id if rule else None,
+            visual_plan_id=slot.product_visual_plan_id if slot else None,
             asset_slot_id=data.asset_slot_id,
+            platform=PlatformCode(platform.code) if platform else None,
+            market=slot.plan.market if slot else None,
+            category=slot.plan.category if slot else None,
+            image_slot=(ImageSlot(self._value(slot.image_type)) if slot else None),
             task_type=task_type,
             generation_mode=GenerationMode.STRICT,
             reference_asset_version_ids=[str(item.id) for item in source_versions],
@@ -310,8 +319,33 @@ class TemplateRenderService:
         job.output_version_id = output.id
         job.provider_request_id = request_id
         job.status = JobStatus.COMPLETED
-        job.validation_status = ValidationStatus.PASSED
-        job.validation_result = {"valid": True, "violations": []}
+        if rule is not None:
+            result = RuleService(self.session).validate_image(
+                rule,
+                ImageProbe(
+                    width=rendered.width,
+                    height=rendered.height,
+                    byte_size=len(rendered.content),
+                    mime_type=rendered.mime_type,
+                    has_text=self._has_text(document.layers),
+                    has_watermark=False,
+                ),
+            )
+            job.validation_status = (
+                ValidationStatus.PASSED if result.valid else ValidationStatus.FAILED
+            )
+            job.validation_result = {
+                "valid": result.valid,
+                "violations": result.violations,
+                "warnings": [],
+            }
+        else:
+            job.validation_status = ValidationStatus.FAILED
+            job.validation_result = {
+                "valid": False,
+                "violations": [],
+                "warnings": [rule_warning or "RULE_NOT_CONFIGURED"],
+            }
         job.completed_at = completed_at
         job.duration_ms = duration_ms
         job.output_metadata = {
@@ -322,6 +356,7 @@ class TemplateRenderService:
             "mime_type": rendered.mime_type,
             "byte_size": len(rendered.content),
             "source_asset_version_ids": [str(item.id) for item in source_versions],
+            "rule_result": job.validation_result,
         }
         attempt.status = AttemptStatus.COMPLETED
         attempt.provider_request_id = request_id
@@ -355,6 +390,7 @@ class TemplateRenderService:
             if slot.template_id and slot.template_id != version.template_id:
                 raise TemplateInvariantError("asset slot is bound to a different template")
             existing = self.session.scalar(select(Asset).where(Asset.asset_slot_id == slot.id))
+            asset_type = AssetType(self._value(slot.image_type))
         if existing:
             return assets.append_processed_version(
                 existing.id,
@@ -380,6 +416,29 @@ class TemplateRenderService:
         )
         return derived.versions[-1]
 
+    def _platform_context(
+        self, data: TemplateRenderCreate
+    ) -> tuple[AssetSlot | None, Platform | None, RuleVersion | None, str | None]:
+        if data.asset_slot_id is None:
+            return None, None, None, "RULE_NOT_CONFIGURED"
+        slot = self.session.get(AssetSlot, data.asset_slot_id)
+        if slot is None or slot.plan.product_id != data.product_id:
+            raise TemplateInvariantError("asset slot does not belong to the product")
+        platform = self.session.get(Platform, slot.plan.platform_id)
+        if platform is None:
+            return slot, None, None, "RULE_NOT_CONFIGURED"
+        image_slot = ImageSlot(self._value(slot.image_type))
+        pinned = self.session.get(RuleVersion, slot.plan.rule_version_id)
+        if pinned is not None and self._value(pinned.image_slot) == image_slot.value:
+            return slot, platform, pinned, None
+        try:
+            resolved = RuleService(self.session).resolve(
+                PlatformCode(platform.code), slot.plan.market, slot.plan.category, image_slot
+            )
+        except RuleNotFoundError:
+            return slot, platform, None, "RULE_NOT_CONFIGURED"
+        return slot, platform, resolved, None
+
     @classmethod
     def _image_sources(cls, layers) -> set[str]:
         result: set[str] = set()
@@ -389,3 +448,16 @@ class TemplateRenderService:
             if layer.children:
                 result.update(cls._image_sources(layer.children))
         return result
+
+    @classmethod
+    def _has_text(cls, layers) -> bool:
+        for layer in layers:
+            if layer.visible and layer.type is LayerType.TEXT and (layer.text or "").strip():
+                return True
+            if layer.children and cls._has_text(layer.children):
+                return True
+        return False
+
+    @staticmethod
+    def _value(value) -> str:
+        return value.value if hasattr(value, "value") else str(value)

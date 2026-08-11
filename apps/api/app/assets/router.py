@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 from typing import Annotated
@@ -6,6 +7,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
+from PIL import Image, UnidentifiedImageError
 from sqlalchemy.orm import Session
 
 from app.assets.models import AssetType
@@ -18,13 +20,21 @@ router = APIRouter(tags=["assets"])
 MAX_IMAGE_BYTES = 25 * 1024 * 1024
 
 
+@dataclass(frozen=True)
+class UploadedImage:
+    content: bytes
+    mime_type: str
+    width: int
+    height: int
+
+
 def service(
     session: Session = Depends(get_session), storage: ObjectStorage = Depends(get_object_storage)
 ) -> AssetService:
     return AssetService(session, storage)
 
 
-async def read_image(file: UploadFile) -> bytes:
+async def read_image(file: UploadFile) -> UploadedImage:
     content = await file.read(MAX_IMAGE_BYTES + 1)
     if not content:
         raise HTTPException(status_code=422, detail="image file is empty")
@@ -32,7 +42,19 @@ async def read_image(file: UploadFile) -> bytes:
         raise HTTPException(status_code=413, detail="image file exceeds 25MB limit")
     if not (file.content_type or "").startswith("image/"):
         raise HTTPException(status_code=415, detail="only image uploads are accepted")
-    return content
+    try:
+        with Image.open(BytesIO(content)) as image:
+            width, height = image.size
+            image_format = image.format or ""
+            image.verify()
+    except (UnidentifiedImageError, OSError) as exc:
+        raise HTTPException(
+            status_code=415, detail="uploaded content is not a readable image"
+        ) from exc
+    detected_mime = Image.MIME.get(image_format)
+    if not detected_mime:
+        raise HTTPException(status_code=415, detail="uploaded image format is not supported")
+    return UploadedImage(content=content, mime_type=detected_mime, width=width, height=height)
 
 
 @router.post(
@@ -47,15 +69,17 @@ async def upload_original(
     label: Annotated[str | None, Form()] = None,
     assets: AssetService = Depends(service),
 ):
-    content = await read_image(file)
+    image = await read_image(file)
     try:
         return assets.create_original(
             product_id,
-            content,
+            image.content,
             file.filename or "original.bin",
-            file.content_type or "application/octet-stream",
+            image.mime_type,
             sku_id=sku_id,
             label=label,
+            width=image.width,
+            height=image.height,
         )
     except AssetNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -77,16 +101,18 @@ async def create_asset(
     label: Annotated[str | None, Form()] = None,
     assets: AssetService = Depends(service),
 ):
-    content = await read_image(file)
+    image = await read_image(file)
     try:
         if asset_type is AssetType.ORIGINAL:
             return assets.create_original(
                 product_id,
-                content,
+                image.content,
                 file.filename or "original.bin",
-                file.content_type or "application/octet-stream",
+                image.mime_type,
                 sku_id=sku_id,
                 label=label,
+                width=image.width,
+                height=image.height,
             )
         if source_version_id is None:
             raise AssetInvariantError("source_version_id is required for processed assets")
@@ -96,10 +122,12 @@ async def create_asset(
         derived = assets.create_derived(
             source_version_id,
             asset_type,
-            content,
+            image.content,
             file.filename or "processed.bin",
-            file.content_type or "application/octet-stream",
+            image.mime_type,
             label=label,
+            width=image.width,
+            height=image.height,
         )
         return derived
     except AssetNotFoundError as exc:
@@ -166,14 +194,16 @@ async def create_version(
     file: Annotated[UploadFile, File()],
     assets: AssetService = Depends(service),
 ):
-    content = await read_image(file)
+    image = await read_image(file)
     try:
         return assets.append_processed_version(
             asset_id,
             source_version_id,
-            content,
+            image.content,
             file.filename or "processed.bin",
-            file.content_type or "application/octet-stream",
+            image.mime_type,
+            width=image.width,
+            height=image.height,
         )
     except AssetNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
