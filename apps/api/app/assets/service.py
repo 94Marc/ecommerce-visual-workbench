@@ -61,6 +61,7 @@ class AssetService:
         height: int | None = None,
         status: AssetStatus = AssetStatus.REVIEW,
         label: str | None = None,
+        asset_slot_id: uuid.UUID | None = None,
     ) -> Asset:
         if asset_type is AssetType.ORIGINAL:
             raise AssetInvariantError("derived assets cannot use ORIGINAL type")
@@ -72,6 +73,7 @@ class AssetService:
             sku_id=source.asset.sku_id,
             asset_type=asset_type,
             label=label,
+            asset_slot_id=asset_slot_id,
         )
         self.session.add(asset)
         self.session.flush()
@@ -96,6 +98,8 @@ class AssetService:
         filename: str,
         mime_type: str,
         status: AssetStatus = AssetStatus.DRAFT,
+        width: int | None = None,
+        height: int | None = None,
     ) -> AssetVersion:
         asset = self.get_asset(asset_id)
         if asset.asset_type is AssetType.ORIGINAL:
@@ -114,6 +118,8 @@ class AssetService:
             mime_type,
             source_version_id=source_version_id,
             status=status,
+            width=width,
+            height=height,
         )
         self.session.commit()
         self.session.refresh(version)

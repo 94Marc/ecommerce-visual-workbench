@@ -8,6 +8,18 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 
+@pytest.fixture(autouse=True)
+def force_free_image_provider(monkeypatch):
+    """The test suite must never be able to reach a paid image provider."""
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("IMAGE_GENERATION_PROVIDER", "mock")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
 class MemoryObjectStorage:
     def __init__(self):
         self.objects: dict[str, bytes] = {}

@@ -74,7 +74,8 @@ def test_mock_worker_completes_job_with_derived_version(session):
     output = session.get(type(source), completed.output_version_id)
     assert output.source_version_id == source.id
     assert output.asset.asset_type is AssetType.MAIN
-    assert storage.get(output.object_key).startswith(b"MOCK:temu:MAIN:")
+    assert storage.get(output.object_key).startswith(b"\x89PNG")
+    assert completed.provider == "mock"
 
 
 def test_completed_job_is_idempotent(session):

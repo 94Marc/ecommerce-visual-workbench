@@ -13,7 +13,7 @@ from app.assets.storage import ObjectStorage
 from app.catalog.models import Product
 from app.exports.models import ExportBundle, ExportStatus
 from app.exports.schemas import ExportCreate
-from app.jobs.models import GenerationJob, JobStatus
+from app.jobs.models import GenerationJob, JobStatus, ValidationStatus
 from app.reviews.models import ReviewDecision
 from app.reviews.service import ReviewService
 
@@ -44,6 +44,7 @@ class ExportService:
                     GenerationJob.market == data.market,
                     GenerationJob.category == data.category,
                     GenerationJob.status == JobStatus.COMPLETED,
+                    GenerationJob.validation_status == ValidationStatus.PASSED,
                     GenerationJob.output_version_id.is_not(None),
                 )
                 .order_by(GenerationJob.image_slot, GenerationJob.completed_at)
@@ -77,6 +78,9 @@ class ExportService:
                         "filename": filename,
                         "asset_version_id": str(version.id),
                         "image_slot": job.image_slot.value,
+                        "asset_slot_id": str(job.asset_slot_id) if job.asset_slot_id else None,
+                        "visual_plan_id": str(job.visual_plan_id) if job.visual_plan_id else None,
+                        "rule_version_id": str(job.resolved_rule_id),
                         "checksum_sha256": hashlib.sha256(content).hexdigest(),
                     }
                 )

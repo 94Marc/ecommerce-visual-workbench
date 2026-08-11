@@ -1,7 +1,7 @@
 from app.core.database import Base
 
 
-def test_phase_two_schema_contains_all_domain_tables():
+def test_phase_three_schema_contains_all_domain_tables():
     expected = {
         "products",
         "skus",
@@ -15,6 +15,7 @@ def test_phase_two_schema_contains_all_domain_tables():
         "product_visual_plans",
         "asset_slots",
         "generation_jobs",
+        "generation_attempts",
         "reviews",
         "export_bundles",
     }

@@ -6,9 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.assets.models import AssetStatus, AssetVersion
 from app.core.models import utc_now
-from app.jobs.models import GenerationJob, JobStatus
+from app.jobs.models import GenerationJob, JobStatus, ValidationStatus
 from app.jobs.queue import JobDispatcher
-from app.jobs.schemas import GenerationJobCreate
 from app.jobs.service import JobService
 from app.reviews.models import Review, ReviewDecision
 from app.reviews.schemas import ReviewCreate, ReviewUpdate
@@ -45,6 +44,11 @@ class ReviewService:
         )
         if job is None or job.status is not JobStatus.COMPLETED:
             raise ReviewInvariantError("only completed generation outputs can be reviewed")
+        if (
+            data.decision is ReviewDecision.APPROVED
+            and job.validation_status is not ValidationStatus.PASSED
+        ):
+            raise ReviewInvariantError("output must pass its pinned platform rule before approval")
 
         review = Review(
             asset_version_id=asset_version_id,
@@ -62,16 +66,15 @@ class ReviewService:
 
         regenerated_job = None
         if data.decision is ReviewDecision.REGENERATE:
-            regenerated_job = JobService(self.session, self.dispatcher).create_job(
-                GenerationJobCreate(
-                    source_version_id=job.source_version_id,
-                    platform=job.platform,
-                    market=job.market,
-                    category=job.category,
-                    image_slot=job.image_slot,
-                    parameters={**job.parameters, "regenerated_from_review_id": str(review.id)},
-                )
+            regenerated_job = JobService(self.session, self.dispatcher).regenerate_job(
+                job.id, data.comment
             )
+            regenerated_job.parameters = {
+                **regenerated_job.parameters,
+                "regenerated_from_review_id": str(review.id),
+            }
+            self.session.commit()
+            self.session.refresh(regenerated_job)
         return ReviewResult(review=review, regenerated_job=regenerated_job)
 
     def list_reviews(self, asset_version_id: uuid.UUID) -> list[Review]:
