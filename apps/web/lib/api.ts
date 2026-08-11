@@ -66,8 +66,9 @@ export type Asset = {
 
 export type GenerationJob = {
   id: string;
-  platform: string;
-  image_slot: string;
+  platform: string | null;
+  image_slot: string | null;
+  task_type?: TaskType;
   status: "pending" | "processing" | "completed" | "failed";
   generation_mode?: "STRICT" | "BALANCED" | "CREATIVE";
   reference_asset_version_ids?: string[];
@@ -76,10 +77,16 @@ export type GenerationJob = {
   prompt?: string;
   revised_prompt?: string | null;
   provider_request_id?: string | null;
+  workflow_definition_id?: string | null;
+  negative_prompt?: string | null;
+  seed?: number | null;
   duration_ms?: number | null;
   retry_count?: number;
   attempt_count?: number;
   output_version_id?: string | null;
+  output_metadata?: Record<string, unknown>;
+  failure_code?: string | null;
+  error_message?: string | null;
   quality_check?: GenerationQualityCheck | null;
   review_result?: {
     decision: string;
@@ -89,6 +96,28 @@ export type GenerationJob = {
     created_at: string;
   } | null;
   created_at: string;
+};
+
+export const taskTypes = [
+  "REMOVE_BACKGROUND",
+  "UPSCALE",
+  "GENERATE_SCENE",
+  "GENERATE_USAGE",
+  "GENERATE_BACKGROUND",
+  "GENERATE_DETAIL",
+  "GENERATE_MAIN",
+] as const;
+export type TaskType = (typeof taskTypes)[number];
+
+export type WorkflowDefinition = {
+  id: string;
+  name: string;
+  version: string;
+  task_type: TaskType;
+  provider: string;
+  workflow_file: string;
+  default_parameters: Record<string, unknown>;
+  active: boolean;
 };
 
 export type QualityResult = {
@@ -160,6 +189,11 @@ export const demoVisualPlans: ProductVisualPlan[] = [{
     {id: "usage-home", code: "USAGE_HOME", image_type: "USAGE", position: 3, label: "居家使用"}],
   created_at: "2026-08-10T10:00:00Z",
 }];
+
+export const demoWorkflows: WorkflowDefinition[] = [
+  {id: "workflow-main", name: "product_main_white", version: "1.0.0", task_type: "GENERATE_MAIN", provider: "comfyui", workflow_file: "product_main_white.v1.json", default_parameters: {generation_mode: "STRICT"}, active: true},
+  {id: "workflow-scene", name: "product_scene", version: "1.0.0", task_type: "GENERATE_SCENE", provider: "comfyui", workflow_file: "product_scene.v1.json", default_parameters: {generation_mode: "BALANCED"}, active: true},
+];
 
 export const demoProducts: Product[] = [
   {
@@ -255,10 +289,12 @@ export const demoAssets: Asset[] = assetTypes.map((assetType, index) => ({
 export const demoJobs: GenerationJob[] = [
   {
     id: "j-1", platform: "temu", image_slot: "MAIN", status: "completed",
+    task_type: "GENERATE_MAIN", workflow_definition_id: "workflow-main",
     generation_mode: "STRICT", reference_asset_version_ids: ["demo-original-front", "demo-original-side"],
     provider: "openai", provider_model: "gpt-image-2", provider_request_id: "req_demo_8fc1",
     prompt: "Create a faithful Temu main image from both supplier reference angles. Preserve color, texture, logo and structure.",
     revised_prompt: null, duration_ms: 18420, retry_count: 0, output_version_id: "demo-main-v3",
+    output_metadata: {output_width: 1600, output_height: 1600, mime_type: "image/png"},
     quality_check: {
       product_similarity: {status: "unavailable", details: "等待相似度分析器"},
       resolution: {status: "passed", actual: {width: 1600, height: 1600}},
@@ -270,8 +306,8 @@ export const demoJobs: GenerationJob[] = [
     review_result: {decision: "approved", reason: null, comment: "主体与供应商原图一致", reviewer: "当前运营", created_at: "2026-08-10T10:02:00Z"},
     created_at: "2026-08-10T09:30:00Z",
   },
-  {id: "j-2", platform: "temu", image_slot: "SCENE", status: "processing", generation_mode: "BALANCED", reference_asset_version_ids: ["demo-original-front"], provider: "openai", prompt: "Place the unchanged product in a realistic travel setting.", retry_count: 1, created_at: "2026-08-10T09:32:00Z"},
-  {id: "j-3", platform: "temu", image_slot: "DIMENSION", status: "pending", generation_mode: "STRICT", reference_asset_version_ids: ["demo-original-front", "demo-original-side"], provider: "mock", prompt: "Create an exact dimension view without changing product geometry.", retry_count: 0, created_at: "2026-08-10T09:33:00Z"},
+  {id: "j-2", platform: "temu", image_slot: "SCENE", task_type: "GENERATE_SCENE", workflow_definition_id: "workflow-scene", status: "processing", generation_mode: "BALANCED", reference_asset_version_ids: ["demo-original-front"], provider: "comfyui", prompt: "Place the unchanged product in a realistic travel setting.", retry_count: 1, created_at: "2026-08-10T09:32:00Z"},
+  {id: "j-3", platform: "temu", image_slot: "DIMENSION", task_type: "GENERATE_DETAIL", status: "pending", generation_mode: "STRICT", reference_asset_version_ids: ["demo-original-front", "demo-original-side"], provider: "mock", prompt: "Create an exact dimension view without changing product geometry.", retry_count: 0, created_at: "2026-08-10T09:33:00Z"},
 ];
 
 export const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
@@ -301,12 +337,29 @@ export async function loadGenerationRecords() {
 
 export async function loadProductWorkspace(productId: string) {
   if (productId.startsWith("demo-")) {
-    return {product: demoProducts[0], assets: demoAssets, demo: true};
+    return {product: demoProducts[0], assets: demoAssets, jobs: demoJobs, workflows: demoWorkflows, demo: true};
   }
-  const product = await read<Product | null>(`/products/${productId}`, null);
-  const assets = await read<Asset[]>(`/products/${productId}/assets`, []);
-  if (!product) return {product: demoProducts[0], assets: demoAssets, demo: true};
-  return {product, assets, demo: false};
+  const [product, assets, jobs, workflows] = await Promise.all([
+    read<Product | null>(`/products/${productId}`, null),
+    read<Asset[]>(`/products/${productId}/assets`, []),
+    read<GenerationJob[]>(`/generation-jobs?product_id=${productId}`, []),
+    read<WorkflowDefinition[]>("/generation-jobs/workflows", []),
+  ]);
+  if (!product) return {product: demoProducts[0], assets: demoAssets, jobs: demoJobs, workflows: demoWorkflows, demo: true};
+  return {product, assets, jobs, workflows, demo: false};
+}
+
+export async function createImageTask(payload: Record<string, unknown>) {
+  const response = await fetch(`${apiUrl}/generation-jobs/tasks`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as {detail?: string};
+    throw new Error(body.detail ?? "图片处理任务创建失败");
+  }
+  return response.json() as Promise<GenerationJob>;
 }
 
 export async function loadPlatformRuleCenter() {

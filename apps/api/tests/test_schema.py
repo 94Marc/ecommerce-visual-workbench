@@ -17,6 +17,7 @@ def test_phase_three_schema_contains_all_domain_tables():
         "generation_jobs",
         "generation_attempts",
         "generation_quality_checks",
+        "workflow_definitions",
         "reviews",
         "export_bundles",
     }
@@ -70,7 +71,7 @@ def test_required_foreign_keys_are_not_nullable():
         "skus": ["product_id"],
         "assets": ["product_id"],
         "asset_versions": ["asset_id"],
-        "generation_jobs": ["source_version_id", "resolved_rule_id"],
+        "generation_jobs": ["source_version_id"],
         "reviews": ["asset_version_id", "generation_job_id"],
         "export_bundles": ["product_id"],
     }
@@ -78,3 +79,11 @@ def test_required_foreign_keys_are_not_nullable():
     for table_name, column_names in required_columns.items():
         table = Base.metadata.tables[table_name]
         assert all(not table.c[column_name].nullable for column_name in column_names)
+
+
+def test_processing_tasks_allow_no_platform_rule_but_pin_workflows():
+    table = Base.metadata.tables["generation_jobs"]
+    assert table.c.resolved_rule_id.nullable is True
+    assert table.c.workflow_definition_id.nullable is True
+    targets = {foreign_key.target_fullname for foreign_key in table.foreign_keys}
+    assert "workflow_definitions.id" in targets

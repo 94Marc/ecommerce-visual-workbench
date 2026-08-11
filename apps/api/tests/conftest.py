@@ -14,6 +14,9 @@ def force_free_image_provider(monkeypatch):
     from app.core.config import get_settings
 
     monkeypatch.setenv("IMAGE_GENERATION_PROVIDER", "mock")
+    monkeypatch.setenv("REMBG_ENABLED", "false")
+    monkeypatch.setenv("REALESRGAN_ENABLED", "false")
+    monkeypatch.setenv("COMFYUI_ENABLED", "false")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     get_settings.cache_clear()
     yield

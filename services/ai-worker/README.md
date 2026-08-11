@@ -1,8 +1,10 @@
 # AI worker
 
-The worker consumes generation-job UUIDs from Redis and runs the provider selected by environment
-configuration. `IMAGE_GENERATION_PROVIDER=mock` is free and deterministic. Setting it to `openai`
-with a non-empty `OPENAI_API_KEY` enables the OpenAI Image API edit flow.
+The worker consumes unified image-task UUIDs from Redis and routes them to rembg, Real-ESRGAN,
+ComfyUI, OpenAI or the generation-only mock according to task type and environment configuration.
+`IMAGE_GENERATION_PROVIDER=mock` is free and deterministic. Setting it to `openai` with a non-empty
+`OPENAI_API_KEY` enables the OpenAI Image API edit flow; setting it to `comfyui` requires the
+independent ComfyUI HTTP service.
 
 Run migrations and infrastructure first, then start the worker from the repository root:
 

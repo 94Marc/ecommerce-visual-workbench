@@ -4,13 +4,18 @@ import { Badge, Button, Card, cn } from "@ecommerce-visual-workbench/ui";
 import {
   ArrowUpRight,
   Check,
-  ChevronRight,
+  Eraser,
   FileImage,
   History,
+  ImagePlus,
   LockKeyhole,
+  Maximize2,
   PackagePlus,
   Ruler,
+  ScanLine,
+  Sparkles,
   Upload,
+  WandSparkles,
   Weight,
 } from "lucide-react";
 import Link from "next/link";
@@ -20,11 +25,15 @@ import { AssetArtwork } from "@/components/asset-artwork";
 import {
   apiUrl,
   assetTypes,
+  createImageTask,
   latestVersion,
   type Asset,
   type AssetStatus,
   type AssetType,
+  type GenerationJob,
   type Product,
+  type TaskType,
+  type WorkflowDefinition,
 } from "@/lib/api";
 
 const typeLabels: Record<AssetType, string> = {
@@ -56,19 +65,34 @@ const statusLabels: Record<AssetStatus, string> = {
   REJECTED: "已拒绝",
 };
 
+const processingActions = [
+  {taskType: "REMOVE_BACKGROUND", label: "去背景", detail: "透明 PNG", provider: "rembg", mode: "STRICT", icon: Eraser},
+  {taskType: "UPSCALE", label: "高清增强", detail: "保守纹理", provider: "Real-ESRGAN", mode: "STRICT", icon: Maximize2},
+  {taskType: "GENERATE_MAIN", label: "生成主图", detail: "平台合规", provider: "ComfyUI / OpenAI", mode: "STRICT", icon: ImagePlus, slot: "MAIN"},
+  {taskType: "GENERATE_SCENE", label: "生成场景图", detail: "环境可变", provider: "ComfyUI / OpenAI", mode: "BALANCED", icon: Sparkles, slot: "SCENE"},
+  {taskType: "GENERATE_USAGE", label: "生成使用图", detail: "使用语境", provider: "ComfyUI / OpenAI", mode: "BALANCED", icon: WandSparkles, slot: "USAGE"},
+  {taskType: "GENERATE_DETAIL", label: "生成详情图", detail: "主体锁定", provider: "ComfyUI / OpenAI", mode: "STRICT", icon: ScanLine, slot: "DETAIL"},
+] as const;
+
 export function ProductWorkspace({
   product,
   initialAssets,
+  initialJobs,
+  workflows,
   demo,
 }: {
   product: Product;
   initialAssets: Asset[];
+  initialJobs: GenerationJob[];
+  workflows: WorkflowDefinition[];
   demo: boolean;
 }) {
   const [assets, setAssets] = useState(initialAssets);
+  const [jobs, setJobs] = useState(initialJobs);
   const [filter, setFilter] = useState<AssetType | "ALL">("ALL");
   const [selectedId, setSelectedId] = useState(initialAssets[0]?.id ?? "");
   const [notice, setNotice] = useState<string | null>(null);
+  const [busyTask, setBusyTask] = useState<TaskType | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const selected = assets.find((asset) => asset.id === selectedId) ?? assets[0];
   const visibleAssets = useMemo(
@@ -96,6 +120,41 @@ export function ProductWorkspace({
     setAssets((current) => [...current, created]);
     setSelectedId(created.id);
     setNotice("原图已保存，后续处理将创建新的版本。");
+  }
+
+  async function startProcessing(action: (typeof processingActions)[number]) {
+    if (!selected) return;
+    if (demo) {
+      setNotice(`${action.label}需要连接真实 API；演示模式不会伪造 Provider 结果。`);
+      return;
+    }
+    const source = latestVersion(selected);
+    const isGeneration = action.taskType.startsWith("GENERATE_");
+    const references = assets
+      .filter((asset) => asset.asset_type === "ORIGINAL")
+      .map((asset) => latestVersion(asset).id);
+    setBusyTask(action.taskType);
+    try {
+      const created = await createImageTask({
+        source_version_id: source.id,
+        task_type: action.taskType,
+        generation_mode: action.mode,
+        ...(action.taskType === "UPSCALE" ? {upscale_mode: "CONSERVATIVE"} : {}),
+        ...(isGeneration ? {
+          reference_asset_version_ids: references,
+          platform: "temu",
+          market: "US",
+          category: product.category,
+          image_slot: "slot" in action ? action.slot : undefined,
+        } : {}),
+      });
+      setJobs((current) => [created, ...current]);
+      setNotice(`${action.label}任务已创建；Worker 将写入新的 AssetVersion。`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "图片处理任务创建失败");
+    } finally {
+      setBusyTask(null);
+    }
   }
 
   return (
@@ -162,6 +221,84 @@ export function ProductWorkspace({
                 </div>
               </div>
             ))}
+          </div>
+        </Card>
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[1fr_460px]">
+        <Card className="overflow-hidden p-0">
+          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#e1e6ed] px-5 py-5 lg:px-6">
+            <div>
+              <p className="utility-face text-[10px] tracking-[.14em] text-[#8a94a6]">IMAGE PROCESSING DOCK</p>
+              <h2 className="display-face mt-1 text-2xl font-bold">图片处理工位</h2>
+              <p className="mt-1 text-sm text-[#778296]">先选资产，再选择真实处理路线；不可用的 Provider 会明确失败。</p>
+            </div>
+            <Badge>{selected ? `${typeLabels[selected.asset_type]} · V${latestVersion(selected).version_number}` : "未选源图"}</Badge>
+          </div>
+          <div className="grid gap-px bg-[#e4e8ef] sm:grid-cols-2 lg:grid-cols-3">
+            {processingActions.map((action) => {
+              const Icon = action.icon;
+              const running = busyTask === action.taskType;
+              const workflow = workflows.find((item) => item.task_type === action.taskType && item.active);
+              return (
+                <button
+                  key={action.taskType}
+                  type="button"
+                  disabled={!selected || busyTask !== null}
+                  onClick={() => void startProcessing(action)}
+                  className="group bg-white p-5 text-left transition hover:bg-[#fff8f5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#ff6433] disabled:cursor-not-allowed disabled:opacity-55"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-[#172033] text-white transition group-hover:bg-[#ff6433]">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="utility-face text-[9px] font-bold tracking-[.08em] text-[#9a6655]">{action.mode}</span>
+                  </div>
+                  <div className="mt-4 text-sm font-bold text-[#263149]">{running ? "正在创建…" : action.label}</div>
+                  <div className="mt-1 text-xs text-[#7c8798]">{action.detail} · {workflow?.name ?? action.provider}</div>
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+
+        <Card className="overflow-hidden p-0">
+          <div className="border-b border-[#e1e6ed] px-5 py-5">
+            <p className="utility-face text-[10px] tracking-[.14em] text-[#8a94a6]">ROUTE LEDGER</p>
+            <div className="mt-1 flex items-center justify-between gap-3">
+              <h2 className="display-face text-xl font-bold">最近处理记录</h2>
+              <Button variant="secondary" size="sm" asChild><Link href="/generation-jobs">全部记录</Link></Button>
+            </div>
+          </div>
+          <div className="divide-y divide-[#e6e9ef]">
+            {jobs.slice(0, 4).map((job) => {
+              const workflow = workflows.find((item) => item.id === job.workflow_definition_id);
+              return (
+                <div key={job.id} className="px-5 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="utility-face text-[11px] font-bold text-[#263149]">{job.task_type ?? job.image_slot ?? "IMAGE_TASK"}</span>
+                    <Badge className={job.status === "failed" ? "border-rose-200 bg-rose-50 text-rose-700" : job.status === "completed" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : ""}>{job.status}</Badge>
+                  </div>
+                  <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
+                    {[
+                      ["Provider", `${job.provider ?? "待路由"}${job.provider_model ? ` / ${job.provider_model}` : ""}`],
+                      ["Mode", job.generation_mode ?? "STRICT"],
+                      ["References", `${job.reference_asset_version_ids?.length ?? 1} 张`],
+                      ["Workflow", workflow?.name ?? "direct"],
+                      ["Duration", job.duration_ms != null ? `${(job.duration_ms / 1000).toFixed(1)}s` : "—"],
+                      ["Output Version", job.output_version_id?.slice(0, 12) ?? "等待输出"],
+                    ].map(([label, value]) => (
+                      <div key={label} className="min-w-0">
+                        <dt className="utility-face text-[8px] tracking-[.08em] text-[#9aa2af]">{label}</dt>
+                        <dd className="mt-0.5 truncate font-bold text-[#596579]">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  {job.status === "failed" && <p className="mt-2 text-xs text-rose-700">{job.failure_code}: {job.error_message}</p>}
+                </div>
+              );
+            })}
+            {!jobs.length && <div className="px-5 py-10 text-center text-sm text-[#7d8798]">选择上方路线创建第一条处理任务。</div>}
           </div>
         </Card>
       </section>

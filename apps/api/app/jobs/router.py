@@ -11,11 +11,14 @@ from app.jobs.schemas import (
     GenerationAttemptRead,
     GenerationJobCreate,
     GenerationJobRead,
+    ImageProcessingTaskCreate,
     RegenerationCreate,
     VisualPlanGenerationCreate,
+    WorkflowDefinitionRead,
 )
 from app.jobs.service import JobNotFoundError, JobService, JobStateError
 from app.jobs.worker import GenerationWorker
+from app.jobs.workflows import WorkflowNotFoundError, WorkflowRegistry
 from app.rules.service import RuleNotFoundError
 
 router = APIRouter(prefix="/generation-jobs", tags=["generation-jobs"])
@@ -52,12 +55,34 @@ def create_jobs_from_plan(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@router.post(
+    "/tasks", response_model=GenerationJobRead, status_code=status.HTTP_201_CREATED
+)
+def create_processing_task(
+    data: ImageProcessingTaskCreate, jobs: JobService = Depends(service)
+):
+    try:
+        return jobs.create_processing_task(data)
+    except (JobNotFoundError, RuleNotFoundError, WorkflowNotFoundError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except JobStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/workflows", response_model=list[WorkflowDefinitionRead])
+def list_workflows(
+    session: Session = Depends(get_session), active_only: bool = Query(default=True)
+):
+    return WorkflowRegistry(session).list(active_only=active_only)
+
+
 @router.get("", response_model=list[GenerationJobRead])
 def list_jobs(
     job_status: JobStatus | None = Query(default=None, alias="status"),
+    product_id: uuid.UUID | None = Query(default=None),
     jobs: JobService = Depends(service),
 ):
-    return jobs.list_jobs(job_status)
+    return jobs.list_jobs(job_status, product_id)
 
 
 @router.get("/{job_id}", response_model=GenerationJobRead)

@@ -12,7 +12,7 @@ export default async function ProductWorkspacePage({
   params: Promise<{productId: string}>;
 }) {
   const {productId} = await params;
-  const {product, assets, demo} = await loadProductWorkspace(productId);
+  const {product, assets, jobs, workflows, demo} = await loadProductWorkspace(productId);
   return (
     <WorkspaceShell
       active="product"
@@ -27,7 +27,13 @@ export default async function ProductWorkspacePage({
         </>
       }
     >
-      <ProductWorkspace product={product} initialAssets={assets} demo={demo} />
+      <ProductWorkspace
+        product={product}
+        initialAssets={assets}
+        initialJobs={jobs}
+        workflows={workflows}
+        demo={demo}
+      />
     </WorkspaceShell>
   );
 }

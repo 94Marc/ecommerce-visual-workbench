@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     DateTime,
     Enum,
@@ -49,6 +50,39 @@ class GenerationMode(StrEnum):
     CREATIVE = "CREATIVE"
 
 
+class TaskType(StrEnum):
+    REMOVE_BACKGROUND = "REMOVE_BACKGROUND"
+    UPSCALE = "UPSCALE"
+    GENERATE_SCENE = "GENERATE_SCENE"
+    GENERATE_USAGE = "GENERATE_USAGE"
+    GENERATE_BACKGROUND = "GENERATE_BACKGROUND"
+    GENERATE_DETAIL = "GENERATE_DETAIL"
+    GENERATE_MAIN = "GENERATE_MAIN"
+
+    @property
+    def is_generation(self) -> bool:
+        return self.value.startswith("GENERATE_")
+
+
+class UpscaleMode(StrEnum):
+    CONSERVATIVE = "CONSERVATIVE"
+    TWO_X = "2X"
+    FOUR_X = "4X"
+
+
+class WorkflowDefinition(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "workflow_definitions"
+    __table_args__ = (UniqueConstraint("name", "version"),)
+
+    name: Mapped[str] = mapped_column(String(120), index=True)
+    version: Mapped[str] = mapped_column(String(32))
+    task_type: Mapped[TaskType] = mapped_column(Enum(TaskType), index=True)
+    provider: Mapped[str] = mapped_column(String(32), index=True)
+    workflow_file: Mapped[str] = mapped_column(String(500))
+    default_parameters: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+
+
 class GenerationJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "generation_jobs"
 
@@ -58,8 +92,11 @@ class GenerationJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     output_version_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("asset_versions.id", ondelete="SET NULL"), nullable=True
     )
-    resolved_rule_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("rule_versions.id", ondelete="RESTRICT")
+    resolved_rule_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("rule_versions.id", ondelete="RESTRICT"), nullable=True
+    )
+    workflow_definition_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("workflow_definitions.id", ondelete="RESTRICT"), nullable=True, index=True
     )
     visual_plan_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("product_visual_plans.id", ondelete="RESTRICT"), nullable=True, index=True
@@ -70,10 +107,15 @@ class GenerationJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     parent_job_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("generation_jobs.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    platform: Mapped[PlatformCode] = mapped_column(Enum(PlatformCode), index=True)
-    market: Mapped[str] = mapped_column(String(32))
-    category: Mapped[str] = mapped_column(String(120))
-    image_slot: Mapped[ImageSlot] = mapped_column(Enum(ImageSlot))
+    platform: Mapped[PlatformCode | None] = mapped_column(
+        Enum(PlatformCode), nullable=True, index=True
+    )
+    market: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    image_slot: Mapped[ImageSlot | None] = mapped_column(Enum(ImageSlot), nullable=True)
+    task_type: Mapped[TaskType] = mapped_column(
+        Enum(TaskType), default=TaskType.GENERATE_MAIN, index=True
+    )
     generation_mode: Mapped[GenerationMode] = mapped_column(
         Enum(GenerationMode), default=GenerationMode.STRICT, index=True
     )
@@ -87,6 +129,8 @@ class GenerationJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     provider_request_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
     prompt: Mapped[str] = mapped_column(Text, default="")
     revised_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    negative_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    seed: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     attempt_count: Mapped[int] = mapped_column(Integer, default=0)
     max_attempts: Mapped[int] = mapped_column(Integer, default=3)
     timeout_seconds: Mapped[int] = mapped_column(Integer, default=120)
@@ -97,6 +141,7 @@ class GenerationJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Enum(ValidationStatus), default=ValidationStatus.PENDING, index=True
     )
     validation_result: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    output_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)

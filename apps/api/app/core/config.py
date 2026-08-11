@@ -22,11 +22,20 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
     openai_image_model: str = "gpt-image-2"
-    background_removal_provider: str = "unavailable"
-    image_upscale_provider: str = "unavailable"
+    background_removal_provider: str = "rembg"
+    image_upscale_provider: str = "realesrgan"
+    rembg_enabled: bool = False
+    realesrgan_enabled: bool = False
+    comfyui_enabled: bool = False
     comfyui_base_url: str | None = None
+    comfyui_poll_interval_seconds: float = 0.5
+    comfyui_workflow_root: str = "workflows/comfyui"
     rembg_service_url: str | None = None
     realesrgan_service_url: str | None = None
+    realesrgan_executable: str = "realesrgan-ncnn-vulkan"
+    realesrgan_model: str = "realesrgan-x4plus"
+    realesrgan_tile: int = 256
+    image_processing_temp_dir: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

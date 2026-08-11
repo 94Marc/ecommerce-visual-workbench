@@ -1,4 +1,4 @@
-"""Redis consumer for the environment-selected image generation provider."""
+"""Redis consumer for environment-selected generation and image-processing providers."""
 
 import uuid
 

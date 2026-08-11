@@ -6,9 +6,11 @@ import {
   demoPlatforms,
   demoRules,
   demoVisualPlans,
+  demoWorkflows,
   latestVersion,
   rejectReasons,
   summarizeJobs,
+  taskTypes,
   type GenerationJob,
 } from "./api";
 
@@ -68,5 +70,20 @@ describe("phase 3.5 fidelity records", () => {
     expect(rejectReasons).toContain("PRODUCT_CHANGED");
     expect(rejectReasons).toContain("PACKAGING_ERROR");
     expect(rejectReasons).toHaveLength(10);
+  });
+});
+
+describe("phase 4 real provider routing", () => {
+  it("keeps the seven task routes stable", () => {
+    expect(taskTypes).toEqual([
+      "REMOVE_BACKGROUND", "UPSCALE", "GENERATE_SCENE", "GENERATE_USAGE",
+      "GENERATE_BACKGROUND", "GENERATE_DETAIL", "GENERATE_MAIN",
+    ]);
+  });
+
+  it("exposes versioned ComfyUI workflows and output metadata", () => {
+    expect(demoWorkflows.find((workflow) => workflow.name === "product_main_white")?.provider).toBe("comfyui");
+    expect(demoJobs[0].workflow_definition_id).toBe("workflow-main");
+    expect(demoJobs[0].output_metadata).toMatchObject({output_width: 1600, mime_type: "image/png"});
   });
 });

@@ -13,6 +13,7 @@ erDiagram
   PLATFORM_CATEGORY ||--o{ PLATFORM_RULE : defines
   PLATFORM_RULE ||--o{ RULE_VERSION : versions
   RULE_VERSION ||--o{ GENERATION_JOB : resolves
+  WORKFLOW_DEFINITION ||--o{ GENERATION_JOB : configures
   PRODUCT ||--o{ PRODUCT_VISUAL_PLAN : plans
   PLATFORM ||--o{ PRODUCT_VISUAL_PLAN : targets
   RULE_VERSION ||--o{ PRODUCT_VISUAL_PLAN : pins
@@ -52,7 +53,11 @@ PlatformRule 唯一键为 `(category_id, image_slot, image_type)`。RuleVersion 
 
 ### generation_jobs
 
-保存 source_version_id、目标槽位、平台上下文、resolved_rule_id（指向 RuleVersion）、status、parameters、output_version_id、error_message 与时间戳。合法状态流：pending → processing → completed/failed。
+保存 task_type、source_version_id、引用版本、目标槽位、可选 WorkflowDefinition、平台上下文、resolved_rule_id、Provider、请求 ID、Prompt、seed、重试/超时、output_metadata、output_version_id 与失败分类。生成任务必须固定 RuleVersion；去背景和增强任务不伪造平台规则。合法状态流：pending → processing → completed/failed。
+
+### workflow_definitions
+
+以 `(name, version)` 唯一保存 task_type、provider、workflow_file、default_parameters 和 active。ComfyUI workflow 文件在 Git 中版本化，数据库记录选择的版本；历史任务不会因后续注册表变化而失去追溯信息。
 
 ### reviews
 
@@ -67,4 +72,4 @@ PlatformRule 唯一键为 `(category_id, image_slot, image_type)`。RuleVersion 
 - Product：category；SKU：product_id、code。
 - Asset：product_id、sku_id、asset_type；AssetVersion：asset_id + version_number。
 - PlatformRule：解析复合键 + effective_date DESC。
-- GenerationJob：status + created_at；Review：asset_version_id + created_at DESC。
+- GenerationJob：status、task_type、workflow_definition_id + created_at；Review：asset_version_id + created_at DESC。

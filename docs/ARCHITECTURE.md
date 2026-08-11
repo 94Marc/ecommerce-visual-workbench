@@ -10,8 +10,8 @@ flowchart LR
   API --> PG[(PostgreSQL)]
   API --> R[(Redis)]
   API --> S3[(MinIO / S3)]
-  R --> IW["Image Worker"]
-  R --> AW["AI Worker / V1 Mock"]
+  R --> IW["Image Worker / rembg / Real-ESRGAN"]
+  R --> AW["AI Worker / OpenAI / ComfyUI / Mock"]
   API --> RE["Platform Rule Engine"]
   IW --> S3
   AW --> S3
@@ -24,7 +24,7 @@ flowchart LR
 - `assets`：Asset 逻辑身份、不可变 AssetVersion、对象存储。
 - `rules`：版本化平台规则与确定性解析。
 - `plans`：商品视觉方案、图片数量与确定性 Asset Slot。
-- `jobs`：生成任务、状态机和 Worker 契约。
+- `jobs`：统一图片任务、Workflow Registry、状态机、Provider 路由和 Worker 契约。
 - `reviews`：人工决策及重生成意图。
 - `exports`：已通过版本筛选、命名与 ZIP manifest。
 
@@ -38,6 +38,8 @@ flowchart LR
 - Worker 按 job UUID 幂等；重复执行不得重复推进终态。
 - 对象键使用版本 UUID，禁止覆盖写。
 - 导出由确定的审核通过版本集合生成，并记录校验和。
+- 去背景、增强和生成都只追加 AssetVersion；转换任务允许没有平台规则，生成任务仍必须固定 RuleVersion。
+- ComfyUI 作为独立 HTTP 服务运行；主应用只加载已注册的 API workflow 文件，不嵌入 ComfyUI 运行时。
 
 ## 5. 安全基线
 

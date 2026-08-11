@@ -2,7 +2,7 @@
 
 跨境电商 AI 商品视觉生产工作台。输入供应商原始商品素材，按平台规则组织为主图、详情图、尺寸图、场景图、使用图、包装图、细节图、对比图，并经过审核后导出平台素材 ZIP。
 
-第一阶段不接真实 AI 模型，生成任务由模拟 Worker 产出可审核的占位版本，先验证完整业务闭环。
+项目已完成业务闭环，并进入可配置真实图片处理阶段。CI 始终使用免费 mock；rembg、Real-ESRGAN、ComfyUI 只有显式启用且运行时可用时才执行。
 
 ## Workspace
 
@@ -31,6 +31,13 @@ human review, and approved-only ZIP export. See
 [docs/PHASE3_GENERATION.md](docs/PHASE3_GENERATION.md) for configuration and operating steps.
 Phase 3.5 fidelity modes, multi-angle references and quality gates are documented in
 [docs/PHASE3_5_FIDELITY.md](docs/PHASE3_5_FIDELITY.md).
+
+## Phase 4 image processing providers
+
+Phase 4 adds real rembg background removal, Real-ESRGAN CLI upscaling, independent ComfyUI HTTP
+workflows, task routing, immutable output versions and a product-workspace processing dock. Provider
+installation, environment settings and API operations are documented in
+[docs/PHASE4_PROVIDERS.md](docs/PHASE4_PROVIDERS.md).
 
 ## Phase 1 boundaries
 
