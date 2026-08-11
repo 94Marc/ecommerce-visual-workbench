@@ -7,10 +7,25 @@ import { useMemo, useState } from "react";
 import { AssetArtwork } from "@/components/asset-artwork";
 import {
   latestVersion,
+  rejectReasons,
   submitReview,
   type Asset,
   type AssetStatus,
+  type RejectReason,
 } from "@/lib/api";
+
+const reasonLabels: Record<RejectReason, string> = {
+  PRODUCT_CHANGED: "商品主体改变",
+  WRONG_COLOR: "颜色错误",
+  WRONG_TEXTURE: "纹理错误",
+  WRONG_SHAPE: "形状错误",
+  UNREALISTIC_USAGE: "使用方式不真实",
+  AI_ARTIFACT: "AI 瑕疵",
+  TEXT_ERROR: "文字错误",
+  SIZE_ERROR: "尺寸错误",
+  PACKAGING_ERROR: "包装错误",
+  OTHER: "其他",
+};
 
 const statusLabels: Record<AssetStatus, string> = {
   DRAFT: "草稿",
@@ -42,6 +57,7 @@ export function ReviewConsole({
     "";
   const [selectedId, setSelectedId] = useState(initialSelection);
   const [comment, setComment] = useState("");
+  const [reason, setReason] = useState<RejectReason>("PRODUCT_CHANGED");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const selected = reviewable.find((asset) => asset.id === selectedId) ?? reviewable[0];
@@ -51,7 +67,18 @@ export function ReviewConsole({
     const version = latestVersion(selected);
     setBusy(true);
     try {
-      if (!demo) await submitReview(version.id, decision, comment);
+      if (decision !== "approved" && !comment.trim()) {
+        setMessage("拒绝或重新处理时必须填写修改意见。");
+        return;
+      }
+      if (!demo) {
+        await submitReview(
+          version.id,
+          decision,
+          comment,
+          decision === "approved" ? undefined : reason,
+        );
+      }
       const nextStatus: AssetStatus =
         decision === "approved" ? "APPROVED" : "REJECTED";
       setStatuses((current) => ({...current, [version.id]: nextStatus}));
@@ -136,7 +163,18 @@ export function ReviewConsole({
                 ))}
               </div>
 
-              <label className="mt-6 block text-xs font-bold text-[#4d596d]" htmlFor="review-comment">审核说明</label>
+              <label className="mt-6 block text-xs font-bold text-[#4d596d]" htmlFor="reject-reason">拒绝原因</label>
+              <select
+                id="reject-reason"
+                value={reason}
+                onChange={(event) => setReason(event.target.value as RejectReason)}
+                className="mt-2 w-full rounded-xl border border-[#dce1e9] bg-[#f9fafc] px-3 py-2.5 text-sm outline-none transition focus:border-[#ff6433] focus:ring-2 focus:ring-[#ff6433]/10"
+              >
+                {rejectReasons.map((item) => (
+                  <option key={item} value={item}>{reasonLabels[item]}</option>
+                ))}
+              </select>
+              <label className="mt-4 block text-xs font-bold text-[#4d596d]" htmlFor="review-comment">审核说明</label>
               <textarea
                 id="review-comment"
                 value={comment}

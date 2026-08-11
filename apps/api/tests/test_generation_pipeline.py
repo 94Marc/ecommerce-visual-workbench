@@ -9,14 +9,21 @@ from app.assets.storage import get_object_storage
 from app.catalog.schemas import ProductCreate
 from app.catalog.service import CatalogService
 from app.core.config import Settings
-from app.jobs.models import JobStatus, ValidationStatus
+from app.jobs.models import GenerationMode, JobStatus, ValidationStatus
 from app.jobs.providers import (
+    ComfyUIImageGenerationProvider,
+    ImageGenerationRequest,
     ImageProviderError,
+    ImageTransformationRequest,
     MockImageGenerationProvider,
     OpenAIImageGenerationProvider,
+    RealESRGANUpscaleProvider,
+    ReferenceImage,
+    RembgBackgroundRemovalProvider,
     get_image_generation_provider,
 )
-from app.jobs.schemas import VisualPlanGenerationCreate
+from app.jobs.quality import AnalyzerResult, GenerationQualityEvaluator
+from app.jobs.schemas import GenerationJobCreate, VisualPlanGenerationCreate
 from app.jobs.service import JobService
 from app.jobs.worker import GenerationWorker
 from app.plans.schemas import ProductVisualPlanCreate
@@ -91,6 +98,8 @@ def test_plan_expands_to_structured_slot_jobs_and_persists_versions(session):
     completed = GenerationWorker(session, storage).process(jobs[0].id)
     output = session.get(AssetVersion, completed.output_version_id)
     assert completed.validation_status is ValidationStatus.PASSED
+    assert completed.duration_ms is not None
+    assert completed.retry_count == 0
     assert output.asset.asset_slot_id == plan.slots[0].id
     assert output.asset.asset_type is AssetType.MAIN
 
@@ -114,7 +123,7 @@ def test_single_slot_regeneration_appends_an_immutable_version(session):
     first_version = session.get(AssetVersion, first.output_version_id)
     second_version = session.get(AssetVersion, second.output_version_id)
     assert regenerated.parent_job_id == first.id
-    assert "larger in frame" in regenerated.prompt
+    assert "larger in frame" in regenerated.revised_prompt
     assert first_version.asset_id == second_version.asset_id
     assert second_version.version_number == first_version.version_number + 1
     assert first_version.source_version_id == source.id
@@ -167,7 +176,12 @@ def test_rule_failure_is_persisted_and_blocks_approval(session):
 
     assert completed.status is JobStatus.COMPLETED
     assert completed.validation_status is ValidationStatus.FAILED
-    assert "width must be at least" in completed.validation_result["violations"][0]
+    assert completed.validation_result["violations"] == ["resolution"]
+    assert completed.quality_check.resolution["status"] == "failed"
+    assert completed.quality_check.product_similarity["status"] == "unavailable"
+    assert completed.quality_check.text_risk["status"] == "unavailable"
+    assert completed.quality_check.watermark_risk["status"] == "unavailable"
+    assert completed.quality_check.review_required is True
     assert session.get(AssetVersion, completed.output_version_id).status is AssetStatus.REJECTED
     with pytest.raises(ReviewInvariantError, match="must pass"):
         ReviewService(session, dispatcher).decide(
@@ -184,15 +198,11 @@ def test_provider_factory_falls_back_to_mock_without_key():
 
 
 def test_openai_provider_decodes_image_without_real_network_call():
-    from app.jobs.providers import ImageGenerationRequest
-
     png = MockImageGenerationProvider().generate(
         ImageGenerationRequest(
             job_id="fixture",
             prompt="fixture",
-            source=b"source",
-            source_filename="source.png",
-            source_mime_type="image/png",
+            references=(),
             size="1024x1024",
             width=16,
             height=16,
@@ -219,9 +229,14 @@ def test_openai_provider_decodes_image_without_real_network_call():
         ImageGenerationRequest(
             job_id="job",
             prompt="preserve product",
-            source=b"source",
-            source_filename="source.png",
-            source_mime_type="image/png",
+            references=(
+                ReferenceImage(
+                    asset_version_id="source",
+                    content=b"source",
+                    filename="source.png",
+                    mime_type="image/png",
+                ),
+            ),
             size="1024x1024",
             width=1024,
             height=1024,
@@ -232,6 +247,128 @@ def test_openai_provider_decodes_image_without_real_network_call():
     )
     assert result.content == png
     assert result.provider_request_id == "req_test"
+
+
+def test_unimplemented_providers_report_unavailable_instead_of_faking_output():
+    reference = ReferenceImage("source", b"image", "source.png", "image/png")
+    generation_request = ImageGenerationRequest(
+        job_id="job",
+        prompt="strict",
+        references=(reference,),
+        size="1024x1024",
+        width=1024,
+        height=1024,
+        quality="medium",
+        output_format="png",
+        timeout_seconds=10,
+    )
+    transform_request = ImageTransformationRequest(
+        job_id="job", source=reference, timeout_seconds=10
+    )
+    calls = [
+        lambda: ComfyUIImageGenerationProvider().generate(generation_request),
+        lambda: RembgBackgroundRemovalProvider().remove_background(transform_request),
+        lambda: RealESRGANUpscaleProvider().upscale(transform_request),
+    ]
+    for call in calls:
+        with pytest.raises(ImageProviderError) as captured:
+            call()
+        assert captured.value.code == "provider_unavailable"
+
+
+def test_generation_modes_default_by_asset_slot(session):
+    storage = MemoryObjectStorage()
+    dispatcher = MemoryJobDispatcher()
+    _, source, plan = plan_context(session, storage)
+    main = JobService(session, dispatcher).create_plan_jobs(
+        VisualPlanGenerationCreate(
+            plan_id=plan.id, source_version_id=source.id, slot_ids=[plan.slots[0].id]
+        )
+    )[0]
+    assert main.generation_mode is GenerationMode.STRICT
+
+    for slot, expected in [
+        (ImageSlot.SCENE, GenerationMode.BALANCED),
+        (ImageSlot.COMPARE, GenerationMode.CREATIVE),
+    ]:
+        RuleService(session).create_rule(
+            PlatformRuleCreate(
+                platform=PlatformCode.TEMU,
+                market="US",
+                category="kitchen",
+                image_slot=slot,
+                version="3.0.0",
+                effective_date=date(2026, 8, 1),
+            )
+        )
+        job = JobService(session, dispatcher).create_job(
+            GenerationJobCreate(
+                source_version_id=source.id,
+                platform=PlatformCode.TEMU,
+                market="US",
+                category="kitchen",
+                image_slot=slot,
+            )
+        )
+        assert job.generation_mode is expected
+
+
+class CaptureReferencesProvider(MockImageGenerationProvider):
+    def __init__(self):
+        self.references = ()
+
+    def generate(self, request):
+        self.references = request.references
+        return super().generate(request)
+
+
+def test_multiple_original_angles_are_recorded_and_sent_to_provider(session):
+    storage = MemoryObjectStorage()
+    dispatcher = MemoryJobDispatcher()
+    product, source, plan = plan_context(session, storage)
+    second = AssetService(session, storage).create_original(
+        product.id, b"supplier-side", "mug-side.jpg", "image/jpeg", label="side angle"
+    ).versions[0]
+    job = JobService(session, dispatcher).create_plan_jobs(
+        VisualPlanGenerationCreate(
+            plan_id=plan.id,
+            reference_asset_version_ids=[source.id, second.id],
+            slot_ids=[plan.slots[0].id],
+        )
+    )[0]
+    provider = CaptureReferencesProvider()
+
+    GenerationWorker(session, storage, provider).process(job.id)
+
+    assert job.reference_asset_version_ids == [str(source.id), str(second.id)]
+    assert [item.asset_version_id for item in provider.references] == [
+        str(source.id),
+        str(second.id),
+    ]
+    assert len(job.parameters["task"]["references"]) == 2
+
+
+class PassingSimilarityAnalyzer:
+    name = "test-similarity"
+
+    def analyze(self, output, references):
+        return AnalyzerResult(status="passed", score=0.97)
+
+
+def test_quality_analyzers_are_injectable(session):
+    storage = MemoryObjectStorage()
+    dispatcher = MemoryJobDispatcher()
+    _, source, plan = plan_context(session, storage)
+    job = JobService(session, dispatcher).create_plan_jobs(
+        VisualPlanGenerationCreate(
+            plan_id=plan.id, source_version_id=source.id, slot_ids=[plan.slots[0].id]
+        )
+    )[0]
+    evaluator = GenerationQualityEvaluator(product_similarity=PassingSimilarityAnalyzer())
+
+    completed = GenerationWorker(session, storage, quality_evaluator=evaluator).process(job.id)
+
+    assert completed.quality_check.product_similarity == {"status": "passed", "score": 0.97}
 
 
 def test_generation_pipeline_api_expands_processes_and_regenerates_one_slot(client, session):
@@ -254,6 +391,9 @@ def test_generation_pipeline_api_expands_processes_and_regenerates_one_slot(clie
     processed = client.post(f"/api/v1/generation-jobs/{job['id']}/process")
     assert processed.status_code == 200
     assert processed.json()["validation_status"] == "passed"
+    assert processed.json()["generation_mode"] == "STRICT"
+    assert processed.json()["reference_asset_version_ids"] == [str(source.id)]
+    assert processed.json()["quality_check"]["resolution"]["status"] == "passed"
     attempts = client.get(f"/api/v1/generation-jobs/{job['id']}/attempts")
     assert attempts.status_code == 200
     assert len(attempts.json()) == 1

@@ -7,7 +7,13 @@ from sqlalchemy.orm import Session
 from app.assets.models import Asset, AssetType, AssetVersion
 from app.catalog.models import Product
 from app.core.config import get_settings
-from app.jobs.models import GenerationAttempt, GenerationJob, JobStatus, ValidationStatus
+from app.jobs.models import (
+    GenerationAttempt,
+    GenerationJob,
+    GenerationMode,
+    JobStatus,
+    ValidationStatus,
+)
 from app.jobs.providers import get_configured_provider_identity
 from app.jobs.queue import JobDispatcher
 from app.jobs.schemas import GenerationJobCreate, VisualPlanGenerationCreate
@@ -33,15 +39,21 @@ class JobService:
         if data.visual_plan_id is not None or data.asset_slot_id is not None:
             raise JobStateError("plan and slot jobs must be created through /from-plan")
         source = self._get_original_source(data.source_version_id)
+        reference_ids = data.reference_asset_version_ids or [source.id]
+        if source.id not in reference_ids:
+            reference_ids.insert(0, source.id)
+        references = self._get_original_references(reference_ids, source.asset.product_id)
         rule = RuleService(self.session).resolve(
             data.platform, data.market, data.category, data.image_slot
         )
-        task = self._manual_task(data, source, rule)
+        task = self._manual_task(data, references, rule)
         job = self._new_job(
             data=data,
             rule=rule,
             task=task,
             prompt=self._build_prompt(task),
+            references=references,
+            generation_mode=data.generation_mode or self._default_mode(data.image_slot),
         )
         self.session.commit()
         self.session.refresh(job)
@@ -57,7 +69,10 @@ class JobService:
         pinned_rule = self.session.get(RuleVersion, plan.rule_version_id)
         if product is None or platform is None or pinned_rule is None:
             raise JobNotFoundError("visual plan references are incomplete")
-        source = self._resolve_plan_source(plan, data.source_version_id)
+        references = self._resolve_plan_references(
+            plan, data.reference_asset_version_ids, data.source_version_id
+        )
+        source = references[0]
         selected = self._select_slots(plan, data.slot_ids)
         jobs: list[GenerationJob] = []
         for slot in selected:
@@ -71,13 +86,18 @@ class JobService:
                     ImageSlot(self._value(slot.image_type)),
                 )
             )
-            task = self._plan_task(product, plan, slot, source, rule, platform)
+            mode = data.generation_mode or self._default_mode(
+                ImageSlot(self._value(slot.image_type))
+            )
+            task = self._plan_task(product, plan, slot, references, rule, platform, mode)
             job_data = GenerationJobCreate(
                 source_version_id=source.id,
                 platform=PlatformCode(platform.code),
                 market=plan.market,
                 category=plan.category,
                 image_slot=ImageSlot(self._value(slot.image_type)),
+                generation_mode=mode,
+                reference_asset_version_ids=[reference.id for reference in references],
                 visual_plan_id=plan.id,
                 asset_slot_id=slot.id,
                 parameters={"task": task},
@@ -88,6 +108,8 @@ class JobService:
                     rule=rule,
                     task=task,
                     prompt=self._build_prompt(task),
+                    references=references,
+                    generation_mode=mode,
                 )
             )
         self.session.commit()
@@ -127,6 +149,7 @@ class JobService:
         job.error_message = None
         job.retryable = False
         job.completed_at = None
+        job.duration_ms = None
         job.validation_status = ValidationStatus.PENDING
         job.validation_result = {}
         job.parameters = {
@@ -138,17 +161,36 @@ class JobService:
         self.dispatcher.enqueue(job.id)
         return job
 
-    def regenerate_job(self, job_id: uuid.UUID, feedback: str | None = None) -> GenerationJob:
+    def regenerate_job(
+        self,
+        job_id: uuid.UUID,
+        feedback: str | None = None,
+        reject_reason: str | None = None,
+    ) -> GenerationJob:
         parent = self.get_job(job_id)
         if parent.status is not JobStatus.COMPLETED:
             raise JobStateError("only completed jobs can be regenerated")
+        reference_ids = [uuid.UUID(item) for item in parent.reference_asset_version_ids]
+        if not reference_ids:
+            reference_ids = [parent.source_version_id]
+        source = self._get_original_source(parent.source_version_id)
+        references = self._get_original_references(reference_ids, source.asset.product_id)
         task = dict(parent.parameters.get("task", {}))
-        if feedback:
-            task["review_feedback"] = feedback
+        task["references"] = [self._reference_snapshot(item) for item in references]
+        task["revision"] = {
+            "reject_reason": reject_reason,
+            "review_comment": feedback,
+            "previous_prompt": parent.revised_prompt or parent.prompt,
+        }
         parameters = {**parent.parameters, "task": task, "regenerated_from_job_id": str(parent.id)}
         if feedback:
             parameters["review_feedback"] = feedback
+        if reject_reason:
+            parameters["reject_reason"] = reject_reason
         provider_name, provider_model = get_configured_provider_identity()
+        revised_prompt = self._build_revised_prompt(
+            parent.revised_prompt or parent.prompt, reject_reason, feedback
+        )
         job = GenerationJob(
             source_version_id=parent.source_version_id,
             resolved_rule_id=parent.resolved_rule_id,
@@ -159,9 +201,12 @@ class JobService:
             market=parent.market,
             category=parent.category,
             image_slot=parent.image_slot,
+            generation_mode=parent.generation_mode,
+            reference_asset_version_ids=[str(item.id) for item in references],
             status=JobStatus.PENDING,
             parameters=parameters,
-            prompt=self._build_prompt(task),
+            prompt=parent.prompt,
+            revised_prompt=revised_prompt,
             provider=provider_name,
             provider_model=provider_model,
             max_attempts=get_settings().image_generation_max_attempts,
@@ -180,13 +225,19 @@ class JobService:
         rule: RuleVersion,
         task: dict[str, Any],
         prompt: str,
+        references: list[AssetVersion],
+        generation_mode: GenerationMode,
     ) -> GenerationJob:
         settings = get_settings()
         provider_name, provider_model = get_configured_provider_identity(settings)
         parameters = {**data.parameters, "task": task}
         job = GenerationJob(
-            **data.model_dump(exclude={"parameters"}),
+            **data.model_dump(
+                exclude={"parameters", "reference_asset_version_ids", "generation_mode"}
+            ),
             parameters=parameters,
+            reference_asset_version_ids=[str(item.id) for item in references],
+            generation_mode=generation_mode,
             resolved_rule_id=rule.id,
             status=JobStatus.PENDING,
             provider=provider_name,
@@ -207,15 +258,36 @@ class JobService:
             raise JobStateError("generation source must be an immutable ORIGINAL version")
         return source
 
-    def _resolve_plan_source(
-        self, plan: ProductVisualPlan, source_version_id: uuid.UUID | None
-    ) -> AssetVersion:
-        if source_version_id is not None:
-            source = self._get_original_source(source_version_id)
-            if source.asset.product_id != plan.product_id:
-                raise JobStateError("source image belongs to a different product")
-            return source
-        source = self.session.scalar(
+    def _get_original_references(
+        self, version_ids: list[uuid.UUID], product_id: uuid.UUID
+    ) -> list[AssetVersion]:
+        references: list[AssetVersion] = []
+        seen: set[uuid.UUID] = set()
+        for version_id in version_ids:
+            if version_id in seen:
+                continue
+            reference = self._get_original_source(version_id)
+            if reference.asset.product_id != product_id:
+                raise JobStateError("reference image belongs to a different product")
+            seen.add(version_id)
+            references.append(reference)
+        if not references:
+            raise JobNotFoundError("at least one ORIGINAL reference image is required")
+        return references
+
+    def _resolve_plan_references(
+        self,
+        plan: ProductVisualPlan,
+        reference_ids: list[uuid.UUID] | None,
+        source_version_id: uuid.UUID | None,
+    ) -> list[AssetVersion]:
+        requested = list(reference_ids or [])
+        if source_version_id is not None and source_version_id not in requested:
+            requested.insert(0, source_version_id)
+        if requested:
+            return self._get_original_references(requested, plan.product_id)
+        references = list(
+            self.session.scalars(
             select(AssetVersion)
             .join(Asset, AssetVersion.asset_id == Asset.id)
             .where(
@@ -224,12 +296,13 @@ class JobService:
                 Asset.is_archived.is_(False),
                 AssetVersion.is_deleted.is_(False),
             )
-            .order_by(AssetVersion.created_at.desc())
-            .limit(1)
+                .order_by(Asset.created_at, AssetVersion.created_at.desc())
+                .limit(10)
+            )
         )
-        if source is None:
+        if not references:
             raise JobNotFoundError("visual plan product has no ORIGINAL source image")
-        return source
+        return references
 
     @staticmethod
     def _select_slots(
@@ -261,17 +334,21 @@ class JobService:
         }
 
     def _manual_task(
-        self, data: GenerationJobCreate, source: AssetVersion, rule: RuleVersion
+        self, data: GenerationJobCreate, references: list[AssetVersion], rule: RuleVersion
     ) -> dict[str, Any]:
+        source = references[0]
+        mode = data.generation_mode or self._default_mode(data.image_slot)
         product = self.session.get(Product, source.asset.product_id)
         return {
             "schema_version": "1.0",
             "product": self._product_snapshot(product),
             "source": {"asset_version_id": str(source.id), "checksum": source.checksum_sha256},
+            "references": [self._reference_snapshot(item) for item in references],
             "platform": data.platform.value,
             "market": data.market,
             "category": data.category,
             "slot": {"id": None, "code": data.image_slot.value, "type": data.image_slot.value},
+            "generation_mode": mode.value,
             "rule": self._rule_snapshot(rule),
         }
 
@@ -280,14 +357,17 @@ class JobService:
         product: Product,
         plan: ProductVisualPlan,
         slot: AssetSlot,
-        source: AssetVersion,
+        references: list[AssetVersion],
         rule: RuleVersion,
         platform: Platform,
+        mode: GenerationMode,
     ) -> dict[str, Any]:
+        source = references[0]
         return {
             "schema_version": "1.0",
             "product": self._product_snapshot(product),
             "source": {"asset_version_id": str(source.id), "checksum": source.checksum_sha256},
+            "references": [self._reference_snapshot(item) for item in references],
             "platform": platform.code,
             "market": plan.market,
             "category": plan.category,
@@ -299,7 +379,16 @@ class JobService:
                 "label": slot.label,
                 "position": slot.position,
             },
+            "generation_mode": mode.value,
             "rule": self._rule_snapshot(rule),
+        }
+
+    @staticmethod
+    def _reference_snapshot(reference: AssetVersion) -> dict[str, Any]:
+        return {
+            "asset_version_id": str(reference.id),
+            "checksum": reference.checksum_sha256,
+            "filename": reference.original_filename,
         }
 
     @staticmethod
@@ -328,11 +417,28 @@ class JobService:
         slot = task.get("slot", {})
         rule = task.get("rule", {})
         feedback = task.get("review_feedback")
+        mode = task.get("generation_mode", GenerationMode.STRICT.value)
+        mode_instruction = {
+            GenerationMode.STRICT.value: (
+                "STRICT fidelity: do not change product color, shape, texture, logo, "
+                "construction, proportions or packaging details."
+            ),
+            GenerationMode.BALANCED.value: (
+                "BALANCED fidelity: background, hands, environment and supporting props may "
+                "change, but the product itself must remain maximally consistent."
+            ),
+            GenerationMode.CREATIVE.value: (
+                "CREATIVE composition: allow a stronger marketing atmosphere while keeping the "
+                "recognizable product identity and claims truthful."
+            ),
+        }[mode]
         lines = [
             "Create one production-ready cross-border ecommerce product image.",
             "Use the supplier image as the authoritative product reference. Preserve identity,",
             "shape, material, color, proportions, logos and included parts; "
             "do not invent features.",
+            mode_instruction,
+            f"Use all {len(task.get('references', [])) or 1} supplied reference angles.",
             f"Product: {product.get('name', '')}; category: {product.get('category', '')}.",
             (
                 f"Asset slot: {slot.get('code')} ({slot.get('type')}); purpose: "
@@ -355,6 +461,36 @@ class JobService:
         if feedback:
             lines.append(f"Revision feedback: {feedback}")
         return "\n".join(lines)
+
+    @staticmethod
+    def _build_revised_prompt(
+        previous_prompt: str,
+        reject_reason: str | None,
+        feedback: str | None,
+    ) -> str:
+        revision = [previous_prompt, "", "Revision requirements:"]
+        if reject_reason:
+            revision.append(f"- Reject reason: {reject_reason}")
+        if feedback:
+            revision.append(f"- Reviewer comment: {feedback}")
+        revision.append(
+            "Correct only the identified issue and preserve all unaffected product details."
+        )
+        return "\n".join(revision)
+
+    @staticmethod
+    def _default_mode(image_slot: ImageSlot) -> GenerationMode:
+        if image_slot in {
+            ImageSlot.MAIN,
+            ImageSlot.DETAIL,
+            ImageSlot.DIMENSION,
+            ImageSlot.PACKAGE,
+            ImageSlot.CLOSEUP,
+        }:
+            return GenerationMode.STRICT
+        if image_slot in {ImageSlot.SCENE, ImageSlot.USAGE}:
+            return GenerationMode.BALANCED
+        return GenerationMode.CREATIVE
 
     @staticmethod
     def _value(value: Any) -> str:

@@ -10,7 +10,7 @@ from app.jobs.models import JobStatus
 from app.jobs.schemas import GenerationJobCreate
 from app.jobs.service import JobService
 from app.jobs.worker import GenerationWorker
-from app.reviews.models import ReviewDecision
+from app.reviews.models import RejectReason, ReviewDecision
 from app.reviews.schemas import ReviewCreate, ReviewUpdate
 from app.reviews.service import ReviewInvariantError, ReviewNotFoundError, ReviewService
 from app.rules.models import ImageSlot, PlatformCode
@@ -74,7 +74,8 @@ def test_regenerate_creates_new_pending_job_from_original_source(session):
     result = ReviewService(session, dispatcher).decide(
         output_id,
         ReviewCreate(
-            decision=ReviewDecision.REGENERATE,
+                decision=ReviewDecision.REGENERATE,
+                reason=RejectReason.PRODUCT_CHANGED,
             reviewer="Mina",
             comment="Product is too small in frame",
         ),
@@ -83,6 +84,9 @@ def test_regenerate_creates_new_pending_job_from_original_source(session):
     assert result.regenerated_job.status is JobStatus.PENDING
     assert result.regenerated_job.source_version_id == source.id
     assert result.regenerated_job.parameters["regenerated_from_review_id"] == str(result.review.id)
+    assert result.review.reason is RejectReason.PRODUCT_CHANGED
+    assert "PRODUCT_CHANGED" in result.regenerated_job.revised_prompt
+    assert "too small in frame" in result.regenerated_job.revised_prompt
 
 
 def test_original_asset_cannot_be_reviewed(session):
@@ -93,7 +97,7 @@ def test_original_asset_cannot_be_reviewed(session):
     with pytest.raises(ReviewInvariantError, match="completed generation outputs"):
         ReviewService(session, dispatcher).decide(
             source.id,
-            ReviewCreate(decision=ReviewDecision.REJECTED, reviewer="Mina"),
+            ReviewCreate(decision=ReviewDecision.APPROVED, reviewer="Mina"),
         )
 
 
@@ -105,7 +109,8 @@ def test_review_crud_updates_version_status_and_soft_deletes(session):
     result = reviews.decide(
         output_id,
         ReviewCreate(
-            decision=ReviewDecision.REJECTED,
+                decision=ReviewDecision.REJECTED,
+                reason=RejectReason.AI_ARTIFACT,
             reviewer="Mina",
             comment="Shadow is too strong",
         ),
@@ -130,7 +135,12 @@ def test_review_lookup_is_scoped_to_asset_version(session):
     reviews = ReviewService(session, dispatcher)
     result = reviews.decide(
         output_id,
-        ReviewCreate(decision=ReviewDecision.REJECTED, reviewer="Mina"),
+        ReviewCreate(
+            decision=ReviewDecision.REJECTED,
+            reason=RejectReason.OTHER,
+            reviewer="Mina",
+            comment="Needs another pass",
+        ),
     )
 
     with pytest.raises(ReviewNotFoundError):

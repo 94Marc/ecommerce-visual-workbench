@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   demoAssets,
+  demoJobs,
   demoPlatforms,
   demoRules,
   demoVisualPlans,
   latestVersion,
+  rejectReasons,
   summarizeJobs,
   type GenerationJob,
 } from "./api";
@@ -50,5 +52,21 @@ describe("phase two planning fixtures", () => {
   it("keeps requested output quantities on the visual plan", () => {
     expect(demoVisualPlans[0].requested_outputs).toMatchObject({MAIN: 5, DETAIL: 6, DIMENSION: 2});
     expect(demoVisualPlans[0].slots.map((slot) => slot.code)).toContain("DIMENSION_FRONT");
+  });
+});
+
+describe("phase 3.5 fidelity records", () => {
+  it("exposes references, mode and the complete quality gate", () => {
+    const record = demoJobs[0];
+    expect(record.generation_mode).toBe("STRICT");
+    expect(record.reference_asset_version_ids).toHaveLength(2);
+    expect(record.quality_check?.resolution.status).toBe("passed");
+    expect(record.quality_check?.product_similarity.status).toBe("unavailable");
+  });
+
+  it("keeps the rejection reason taxonomy stable", () => {
+    expect(rejectReasons).toContain("PRODUCT_CHANGED");
+    expect(rejectReasons).toContain("PACKAGING_ERROR");
+    expect(rejectReasons).toHaveLength(10);
   });
 });

@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
     openai_image_model: str = "gpt-image-2"
+    background_removal_provider: str = "unavailable"
+    image_upscale_provider: str = "unavailable"
+    comfyui_base_url: str | None = None
+    rembg_service_url: str | None = None
+    realesrgan_service_url: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

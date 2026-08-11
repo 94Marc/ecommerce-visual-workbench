@@ -69,8 +69,54 @@ export type GenerationJob = {
   platform: string;
   image_slot: string;
   status: "pending" | "processing" | "completed" | "failed";
+  generation_mode?: "STRICT" | "BALANCED" | "CREATIVE";
+  reference_asset_version_ids?: string[];
+  provider?: string;
+  provider_model?: string | null;
+  prompt?: string;
+  revised_prompt?: string | null;
+  provider_request_id?: string | null;
+  duration_ms?: number | null;
+  retry_count?: number;
+  attempt_count?: number;
+  output_version_id?: string | null;
+  quality_check?: GenerationQualityCheck | null;
+  review_result?: {
+    decision: string;
+    reason: string | null;
+    comment: string | null;
+    reviewer: string;
+    created_at: string;
+  } | null;
   created_at: string;
 };
+
+export type QualityResult = {
+  status: "passed" | "failed" | "unavailable";
+  actual?: unknown;
+  expected?: unknown;
+  score?: number;
+  risk?: string;
+  details?: string;
+};
+
+export type GenerationQualityCheck = {
+  product_similarity: QualityResult;
+  resolution: QualityResult;
+  aspect_ratio: QualityResult;
+  file_size: QualityResult;
+  format: QualityResult;
+  text_risk: QualityResult;
+  watermark_risk: QualityResult;
+  review_required: boolean;
+};
+
+export const rejectReasons = [
+  "PRODUCT_CHANGED", "WRONG_COLOR", "WRONG_TEXTURE", "WRONG_SHAPE",
+  "UNREALISTIC_USAGE", "AI_ARTIFACT", "TEXT_ERROR", "SIZE_ERROR",
+  "PACKAGING_ERROR", "OTHER",
+] as const;
+export type RejectReason = (typeof rejectReasons)[number];
 
 export const platformCodes = ["temu", "amazon", "tiktok_shop", "shopee", "aliexpress"] as const;
 export type PlatformCode = (typeof platformCodes)[number];
@@ -206,10 +252,26 @@ export const demoAssets: Asset[] = assetTypes.map((assetType, index) => ({
   ],
 }));
 
-const demoJobs: GenerationJob[] = [
-  {id: "j-1", platform: "temu", image_slot: "MAIN", status: "completed", created_at: "2026-08-10T09:30:00Z"},
-  {id: "j-2", platform: "temu", image_slot: "SCENE", status: "processing", created_at: "2026-08-10T09:32:00Z"},
-  {id: "j-3", platform: "temu", image_slot: "DIMENSION", status: "pending", created_at: "2026-08-10T09:33:00Z"},
+export const demoJobs: GenerationJob[] = [
+  {
+    id: "j-1", platform: "temu", image_slot: "MAIN", status: "completed",
+    generation_mode: "STRICT", reference_asset_version_ids: ["demo-original-front", "demo-original-side"],
+    provider: "openai", provider_model: "gpt-image-2", provider_request_id: "req_demo_8fc1",
+    prompt: "Create a faithful Temu main image from both supplier reference angles. Preserve color, texture, logo and structure.",
+    revised_prompt: null, duration_ms: 18420, retry_count: 0, output_version_id: "demo-main-v3",
+    quality_check: {
+      product_similarity: {status: "unavailable", details: "等待相似度分析器"},
+      resolution: {status: "passed", actual: {width: 1600, height: 1600}},
+      aspect_ratio: {status: "passed", actual: 1, expected: "1:1"},
+      file_size: {status: "passed", actual: 884220}, format: {status: "passed", actual: "image/png"},
+      text_risk: {status: "unavailable", details: "等待文字风险分析器"},
+      watermark_risk: {status: "unavailable", details: "等待水印风险分析器"}, review_required: true,
+    },
+    review_result: {decision: "approved", reason: null, comment: "主体与供应商原图一致", reviewer: "当前运营", created_at: "2026-08-10T10:02:00Z"},
+    created_at: "2026-08-10T09:30:00Z",
+  },
+  {id: "j-2", platform: "temu", image_slot: "SCENE", status: "processing", generation_mode: "BALANCED", reference_asset_version_ids: ["demo-original-front"], provider: "openai", prompt: "Place the unchanged product in a realistic travel setting.", retry_count: 1, created_at: "2026-08-10T09:32:00Z"},
+  {id: "j-3", platform: "temu", image_slot: "DIMENSION", status: "pending", generation_mode: "STRICT", reference_asset_version_ids: ["demo-original-front", "demo-original-side"], provider: "mock", prompt: "Create an exact dimension view without changing product geometry.", retry_count: 0, created_at: "2026-08-10T09:33:00Z"},
 ];
 
 export const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
@@ -230,6 +292,11 @@ export async function loadWorkbench() {
     read<GenerationJob[]>("/generation-jobs", demoJobs),
   ]);
   return {products, jobs, demo: products === demoProducts};
+}
+
+export async function loadGenerationRecords() {
+  const jobs = await read<GenerationJob[]>("/generation-jobs", demoJobs);
+  return {jobs, demo: jobs === demoJobs};
 }
 
 export async function loadProductWorkspace(productId: string) {
@@ -271,11 +338,12 @@ export async function submitReview(
   versionId: string,
   decision: "approved" | "rejected" | "regenerate",
   comment: string,
+  reason?: RejectReason,
 ) {
   const response = await fetch(`${apiUrl}/asset-versions/${versionId}/reviews`, {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({decision, reviewer: "当前运营", comment: comment || null}),
+    body: JSON.stringify({decision, reviewer: "当前运营", comment: comment || null, reason}),
   });
   if (!response.ok) throw new Error((await response.json()).detail ?? "审核操作失败");
   return response.json();

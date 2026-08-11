@@ -67,7 +67,7 @@ class ReviewService:
         regenerated_job = None
         if data.decision is ReviewDecision.REGENERATE:
             regenerated_job = JobService(self.session, self.dispatcher).regenerate_job(
-                job.id, data.comment
+                job.id, data.comment, data.reason.value if data.reason else None
             )
             regenerated_job.parameters = {
                 **regenerated_job.parameters,

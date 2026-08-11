@@ -11,17 +11,30 @@ from app.core.config import Settings, get_settings
 
 
 @dataclass(frozen=True)
+class ReferenceImage:
+    asset_version_id: str
+    content: bytes
+    filename: str
+    mime_type: str
+
+
+@dataclass(frozen=True)
 class ImageGenerationRequest:
     job_id: str
     prompt: str
-    source: bytes
-    source_filename: str
-    source_mime_type: str
+    references: tuple[ReferenceImage, ...]
     size: str
     width: int
     height: int
     quality: str
     output_format: str
+    timeout_seconds: int
+
+
+@dataclass(frozen=True)
+class ImageTransformationRequest:
+    job_id: str
+    source: ReferenceImage
     timeout_seconds: int
 
 
@@ -33,8 +46,6 @@ class ImageGenerationResult:
     width: int
     height: int
     provider_request_id: str | None = None
-    has_text: bool = False
-    has_watermark: bool = False
 
 
 class ImageGenerationProvider(Protocol):
@@ -42,6 +53,22 @@ class ImageGenerationProvider(Protocol):
     model: str
 
     def generate(self, request: ImageGenerationRequest) -> ImageGenerationResult: ...
+
+
+class BackgroundRemovalProvider(Protocol):
+    name: str
+    model: str
+
+    def remove_background(
+        self, request: ImageTransformationRequest
+    ) -> ImageGenerationResult: ...
+
+
+class ImageUpscaleProvider(Protocol):
+    name: str
+    model: str
+
+    def upscale(self, request: ImageTransformationRequest) -> ImageGenerationResult: ...
 
 
 class ImageProviderError(RuntimeError):
@@ -59,11 +86,21 @@ class ImageProviderError(RuntimeError):
         self.request_id = request_id
 
 
+class ProviderUnavailableError(ImageProviderError):
+    def __init__(self, provider: str) -> None:
+        super().__init__(
+            f"{provider} provider is not configured or available",
+            code="provider_unavailable",
+            retryable=False,
+        )
+
+
 class MockImageGenerationProvider:
     """Deterministic free provider used locally and in every automated test."""
 
     name = "mock"
     model = "deterministic-png-v1"
+
     def generate(self, request: ImageGenerationRequest) -> ImageGenerationResult:
         buffer = io.BytesIO()
         Image.new("RGB", (request.width, request.height), (245, 247, 250)).save(
@@ -80,18 +117,24 @@ class MockImageGenerationProvider:
 
 
 class OpenAIImageGenerationProvider:
-    """OpenAI Image API adapter using the supplier image as an edit reference."""
+    """OpenAI Image API adapter using all selected supplier angles as references."""
 
     name = "openai"
 
     def __init__(self, settings: Settings, client: httpx.Client | None = None) -> None:
         if not settings.openai_api_key:
-            raise ValueError("OPENAI_API_KEY is required for the OpenAI image provider")
+            raise ProviderUnavailableError(self.name)
         self.settings = settings
         self.model = settings.openai_image_model
         self.client = client or httpx.Client()
 
     def generate(self, request: ImageGenerationRequest) -> ImageGenerationResult:
+        if not request.references:
+            raise ImageProviderError(
+                "at least one reference image is required",
+                code="missing_reference",
+                retryable=False,
+            )
         endpoint = f"{self.settings.openai_base_url.rstrip('/')}/images/edits"
         try:
             response = self.client.post(
@@ -104,13 +147,13 @@ class OpenAIImageGenerationProvider:
                     "quality": request.quality,
                     "output_format": request.output_format,
                 },
-                files={
-                    "image[]": (
-                        request.source_filename,
-                        request.source,
-                        request.source_mime_type,
+                files=[
+                    (
+                        "image[]",
+                        (reference.filename, reference.content, reference.mime_type),
                     )
-                },
+                    for reference in request.references
+                ],
                 timeout=request.timeout_seconds,
             )
         except httpx.TimeoutException as exc:
@@ -158,17 +201,63 @@ class OpenAIImageGenerationProvider:
         )
 
 
+class ComfyUIImageGenerationProvider:
+    """Explicit placeholder. It never masquerades as a working ComfyUI integration."""
+
+    name = "comfyui"
+    model = "unavailable"
+
+    def generate(self, request: ImageGenerationRequest) -> ImageGenerationResult:
+        raise ProviderUnavailableError(self.name)
+
+
+class RembgBackgroundRemovalProvider:
+    name = "rembg"
+    model = "unavailable"
+
+    def remove_background(
+        self, request: ImageTransformationRequest
+    ) -> ImageGenerationResult:
+        raise ProviderUnavailableError(self.name)
+
+
+class RealESRGANUpscaleProvider:
+    name = "realesrgan"
+    model = "unavailable"
+
+    def upscale(self, request: ImageTransformationRequest) -> ImageGenerationResult:
+        raise ProviderUnavailableError(self.name)
+
+
 def get_image_generation_provider(
     settings: Settings | None = None,
 ) -> ImageGenerationProvider:
     configured = settings or get_settings()
-    if configured.image_generation_provider == "openai" and configured.openai_api_key:
-        return OpenAIImageGenerationProvider(configured)
+    if configured.image_generation_provider == "openai":
+        if configured.openai_api_key:
+            return OpenAIImageGenerationProvider(configured)
+        return MockImageGenerationProvider()
+    if configured.image_generation_provider == "comfyui":
+        return ComfyUIImageGenerationProvider()
     return MockImageGenerationProvider()
 
 
-def get_configured_provider_identity(settings: Settings | None = None) -> tuple[str, str]:
+def get_background_removal_provider(
+    settings: Settings | None = None,
+) -> BackgroundRemovalProvider:
     configured = settings or get_settings()
-    if configured.image_generation_provider == "openai" and configured.openai_api_key:
-        return "openai", configured.openai_image_model
-    return MockImageGenerationProvider.name, MockImageGenerationProvider.model
+    if configured.background_removal_provider == "rembg":
+        return RembgBackgroundRemovalProvider()
+    return RembgBackgroundRemovalProvider()
+
+
+def get_image_upscale_provider(settings: Settings | None = None) -> ImageUpscaleProvider:
+    configured = settings or get_settings()
+    if configured.image_upscale_provider == "realesrgan":
+        return RealESRGANUpscaleProvider()
+    return RealESRGANUpscaleProvider()
+
+
+def get_configured_provider_identity(settings: Settings | None = None) -> tuple[str, str]:
+    provider = get_image_generation_provider(settings)
+    return provider.name, provider.model

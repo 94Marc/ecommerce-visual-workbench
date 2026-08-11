@@ -93,7 +93,11 @@ def regenerate_job(
     jobs: JobService = Depends(service),
 ):
     try:
-        return jobs.regenerate_job(job_id, data.feedback)
+        return jobs.regenerate_job(
+            job_id,
+            data.feedback,
+            data.reject_reason.value if data.reject_reason else None,
+        )
     except JobNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except JobStateError as exc:

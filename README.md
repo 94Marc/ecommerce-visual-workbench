@@ -29,6 +29,8 @@ The generation pipeline supports an environment-selected OpenAI Image API provid
 fallback, versioned per-slot regeneration, retry/timeout persistence, pinned-rule validation,
 human review, and approved-only ZIP export. See
 [docs/PHASE3_GENERATION.md](docs/PHASE3_GENERATION.md) for configuration and operating steps.
+Phase 3.5 fidelity modes, multi-angle references and quality gates are documented in
+[docs/PHASE3_5_FIDELITY.md](docs/PHASE3_5_FIDELITY.md).
 
 ## Phase 1 boundaries
 

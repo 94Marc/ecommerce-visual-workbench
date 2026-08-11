@@ -16,6 +16,7 @@ def test_phase_three_schema_contains_all_domain_tables():
         "asset_slots",
         "generation_jobs",
         "generation_attempts",
+        "generation_quality_checks",
         "reviews",
         "export_bundles",
     }
