@@ -15,6 +15,7 @@ export const assetStatuses = [
   "DRAFT",
   "PROCESSING",
   "REVIEW",
+  "APPROVED_FOR_SMOKE_TEST",
   "APPROVED",
   "REJECTED",
 ] as const;
@@ -502,7 +503,7 @@ export function latestVersion(asset: Asset) {
 
 export async function submitReview(
   versionId: string,
-  decision: "approved" | "rejected" | "regenerate",
+  decision: "approved_for_smoke_test" | "approved" | "rejected" | "regenerate",
   comment: string,
   reason?: RejectReason,
 ) {

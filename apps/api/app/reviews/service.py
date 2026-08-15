@@ -57,6 +57,7 @@ class ReviewService:
         )
         self.session.add(review)
         version.status = {
+            ReviewDecision.APPROVED_FOR_SMOKE_TEST: AssetStatus.APPROVED_FOR_SMOKE_TEST,
             ReviewDecision.APPROVED: AssetStatus.APPROVED,
             ReviewDecision.REJECTED: AssetStatus.REJECTED,
             ReviewDecision.REGENERATE: AssetStatus.REJECTED,
@@ -136,6 +137,9 @@ class ReviewService:
         )
         version.status = (
             {
+                ReviewDecision.APPROVED_FOR_SMOKE_TEST: (
+                    AssetStatus.APPROVED_FOR_SMOKE_TEST
+                ),
                 ReviewDecision.APPROVED: AssetStatus.APPROVED,
                 ReviewDecision.REJECTED: AssetStatus.REJECTED,
                 ReviewDecision.REGENERATE: AssetStatus.REJECTED,

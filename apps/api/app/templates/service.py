@@ -297,6 +297,9 @@ class TemplateRenderService:
                 assets,
                 output_format=data.output_format,
                 quality=data.quality,
+                subject_fill_ratio=data.subject_fill_ratio,
+                edge_cleanup=data.edge_cleanup,
+                tone_correction=data.tone_correction,
             )
             output = self._persist_output(data, version, source, rendered)
         except Exception as exc:
@@ -356,6 +359,7 @@ class TemplateRenderService:
             "mime_type": rendered.mime_type,
             "byte_size": len(rendered.content),
             "source_asset_version_ids": [str(item.id) for item in source_versions],
+            "render_postprocessing": rendered.metadata,
             "rule_result": job.validation_result,
         }
         attempt.status = AttemptStatus.COMPLETED

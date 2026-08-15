@@ -54,6 +54,7 @@ const statusStyle: Record<AssetStatus, string> = {
   DRAFT: "border-slate-200 bg-slate-50 text-slate-600",
   PROCESSING: "border-orange-200 bg-orange-50 text-orange-700",
   REVIEW: "border-blue-200 bg-blue-50 text-blue-700",
+  APPROVED_FOR_SMOKE_TEST: "border-amber-200 bg-amber-50 text-amber-700",
   APPROVED: "border-emerald-200 bg-emerald-50 text-emerald-700",
   REJECTED: "border-rose-200 bg-rose-50 text-rose-700",
 };
@@ -62,6 +63,7 @@ const statusLabels: Record<AssetStatus, string> = {
   DRAFT: "草稿",
   PROCESSING: "处理中",
   REVIEW: "待审核",
+  APPROVED_FOR_SMOKE_TEST: "仅验收通过",
   APPROVED: "已通过",
   REJECTED: "已拒绝",
 };
@@ -376,7 +378,7 @@ export function ProductWorkspace({
                 {[...selected.versions].sort((left, right) => right.version_number - left.version_number).map((version, index) => (
                   <div key={version.id} className="relative flex gap-3 pb-5 last:pb-0">
                     {index < selected.versions.length - 1 && <div className="absolute left-[7px] top-4 h-full w-px bg-[#dce1e9]" />}
-                    <div className={cn("relative mt-1 h-4 w-4 shrink-0 rounded-full border-4 border-white ring-1", version.status === "APPROVED" ? "bg-emerald-500 ring-emerald-300" : version.status === "REJECTED" ? "bg-rose-500 ring-rose-300" : "bg-[#ff6433] ring-[#ffc5b3]")} />
+                    <div className={cn("relative mt-1 h-4 w-4 shrink-0 rounded-full border-4 border-white ring-1", version.status === "APPROVED" ? "bg-emerald-500 ring-emerald-300" : version.status === "APPROVED_FOR_SMOKE_TEST" ? "bg-amber-500 ring-amber-300" : version.status === "REJECTED" ? "bg-rose-500 ring-rose-300" : "bg-[#ff6433] ring-[#ffc5b3]")} />
                     <div className="min-w-0 flex-1 rounded-xl border border-[#e1e5ec] bg-[#f8fafc] p-3">
                       <div className="flex items-center justify-between"><span className="utility-face text-xs font-bold">VERSION {version.version_number}</span><Badge className={statusStyle[version.status]}>{statusLabels[version.status]}</Badge></div>
                       <p className="mt-2 truncate text-xs text-[#758095]">{version.original_filename}</p>

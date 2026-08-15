@@ -76,6 +76,9 @@ class TemplateRenderCreate(BaseModel):
     asset_slot_id: uuid.UUID | None = None
     output_format: Literal["PNG", "JPEG"] = "PNG"
     quality: int = Field(default=92, ge=1, le=100)
+    subject_fill_ratio: float | None = Field(default=None, ge=0.70, le=0.85)
+    edge_cleanup: bool = False
+    tone_correction: bool = False
 
 
 class TemplateRenderRecordRead(BaseModel):

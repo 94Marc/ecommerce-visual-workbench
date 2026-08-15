@@ -66,6 +66,24 @@ def test_approve_generated_version(session):
     assert session.get(AssetVersion, output_id).status is AssetStatus.APPROVED
 
 
+def test_smoke_approval_is_distinct_from_production_approval(session):
+    storage = MemoryObjectStorage()
+    dispatcher = MemoryJobDispatcher()
+    output_id, _ = completed_output(session, storage, dispatcher)
+
+    result = ReviewService(session, dispatcher).decide(
+        output_id,
+        ReviewCreate(
+            decision=ReviewDecision.APPROVED_FOR_SMOKE_TEST,
+            reviewer="Phase 6.3 human review",
+            comment="Workflow validated only; not approved for final production.",
+        ),
+    )
+
+    assert result.review.decision is ReviewDecision.APPROVED_FOR_SMOKE_TEST
+    assert session.get(AssetVersion, output_id).status is AssetStatus.APPROVED_FOR_SMOKE_TEST
+
+
 def test_regenerate_creates_new_pending_job_from_original_source(session):
     storage = MemoryObjectStorage()
     dispatcher = MemoryJobDispatcher()

@@ -8,10 +8,11 @@ from app.catalog.service import CatalogService
 from app.jobs.models import JobStatus, ProviderType, TaskType
 from app.templates.bindings import TemplateBindingError, TemplateBindingResolver, format_dimension
 from app.templates.models import TemplateStatus, TemplateType
+from app.templates.renderer import DeterministicTemplateRenderer
 from app.templates.schema_types import validate_template_schema
 from app.templates.schemas import TemplateCreate, TemplateRenderCreate, TemplateVersionInput
 from app.templates.service import TemplateRenderService, TemplateService
-from PIL import Image
+from PIL import Image, ImageChops
 from pydantic import ValidationError
 
 from tests.conftest import MemoryObjectStorage
@@ -66,6 +67,61 @@ def png_bytes(color="#5b8f72"):
     output = io.BytesIO()
     Image.new("RGBA", (120, 160), color).save(output, format="PNG")
     return output.getvalue()
+
+
+def test_contain_scales_up_to_layer_bounds_and_preserves_ratio(session):
+    product, _, storage, _, approved = product_with_assets(session)
+    template = create_template(session, "CONTAIN_SCALE_01")
+    bindings = TemplateBindingResolver(session)
+    rendered = DeterministicTemplateRenderer(storage, bindings).render(
+        template.latest_version,
+        bindings.product_snapshot(product, None),
+        {"{{asset.cutout}}": approved},
+        output_format="PNG",
+        quality=92,
+    )
+    with Image.open(io.BytesIO(rendered.content)).convert("RGB") as image:
+        background = Image.new("RGB", image.size, "white")
+        layer_box = (20, 20, 240, 240)
+        bbox = ImageChops.difference(
+            image.crop(layer_box), background.crop(layer_box)
+        ).getbbox()
+    assert bbox == (28, 0, 193, 220)
+
+
+def test_main_postprocessing_fill_ratio_and_fidelity_limits(session):
+    product, _, storage, _, approved = product_with_assets(session)
+    template = create_template(session, "MAIN_POSTPROCESS_01")
+    bindings = TemplateBindingResolver(session)
+    rendered = DeterministicTemplateRenderer(storage, bindings).render(
+        template.latest_version,
+        bindings.product_snapshot(product, None),
+        {"{{asset.cutout}}": approved},
+        output_format="PNG",
+        quality=92,
+        subject_fill_ratio=0.78,
+        edge_cleanup=True,
+        tone_correction=True,
+    )
+    assert rendered.metadata["subject_bbox"] == [62, 33, 238, 267]
+    assert rendered.metadata["actual_subject_fill_ratio"] == 0.78
+    assert rendered.metadata["warnings"] == ["SOURCE_QUALITY_LOW"]
+    assert rendered.metadata["processors"]["edge_cleanup"]["alpha_preserved"] is True
+    tone = rendered.metadata["processors"]["tone_correction"]
+    assert tone["limits"]["max_channel_gain_delta"] == 0.025
+    assert tone["brightness_factor"] <= 1.04
+    assert tone["contrast_factor"] <= 1.03
+
+
+def test_subject_fill_ratio_is_bounded():
+    data = {
+        "template_version_id": "20000000-0000-4000-8000-000000000001",
+        "product_id": "10000000-0000-4000-8000-000000000001",
+    }
+    with pytest.raises(ValidationError):
+        TemplateRenderCreate(**data, subject_fill_ratio=0.69)
+    with pytest.raises(ValidationError):
+        TemplateRenderCreate(**data, subject_fill_ratio=0.86)
 
 
 def product_with_assets(session):
@@ -195,6 +251,17 @@ def test_only_approved_assets_can_be_selected(session):
             {"{{asset.cutout}}": rejected.id},
         )
     assert storage.get(approved.object_key) == png_bytes()
+
+
+def test_smoke_test_approved_asset_is_not_used_for_production_template_binding(session):
+    product, _, _, _, approved = product_with_assets(session)
+    approved.status = AssetStatus.APPROVED_FOR_SMOKE_TEST
+    session.commit()
+
+    with pytest.raises(TemplateBindingError, match="APPROVED"):
+        TemplateBindingResolver(session).approved_assets(
+            product.id, {"{{asset.cutout}}"}
+        )
 
 
 def test_render_task_creates_review_version_and_traceability(session):

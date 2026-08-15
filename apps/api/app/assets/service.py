@@ -195,10 +195,16 @@ class AssetService:
             AssetStatus.PROCESSING: {AssetStatus.REVIEW, AssetStatus.REJECTED},
             AssetStatus.REVIEW: {
                 AssetStatus.PROCESSING,
+                AssetStatus.APPROVED_FOR_SMOKE_TEST,
                 AssetStatus.APPROVED,
                 AssetStatus.REJECTED,
             },
             AssetStatus.REJECTED: {AssetStatus.PROCESSING},
+            AssetStatus.APPROVED_FOR_SMOKE_TEST: {
+                AssetStatus.PROCESSING,
+                AssetStatus.APPROVED,
+                AssetStatus.REJECTED,
+            },
             AssetStatus.APPROVED: set(),
         }
         if status is not version.status and status not in allowed[version.status]:

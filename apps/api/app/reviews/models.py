@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 
 class ReviewDecision(StrEnum):
+    APPROVED_FOR_SMOKE_TEST = "approved_for_smoke_test"
     APPROVED = "approved"
     REJECTED = "rejected"
     REGENERATE = "regenerate"

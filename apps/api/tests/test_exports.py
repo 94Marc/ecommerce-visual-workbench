@@ -98,3 +98,27 @@ def test_export_rejects_scope_without_approved_assets(session):
                 category="travel",
             )
         )
+
+
+def test_export_excludes_smoke_test_approved_assets(session):
+    storage = MemoryObjectStorage()
+    dispatcher = MemoryJobDispatcher()
+    product, output_id = generated_scope(session, storage, dispatcher)
+    ReviewService(session, dispatcher).decide(
+        output_id,
+        ReviewCreate(
+            decision=ReviewDecision.APPROVED_FOR_SMOKE_TEST,
+            reviewer="Phase 6.3 human review",
+            comment="Smoke-test workflow only.",
+        ),
+    )
+
+    with pytest.raises(ExportInvariantError, match="no approved"):
+        ExportService(session, storage).create_bundle(
+            ExportCreate(
+                product_id=product.id,
+                platform=PlatformCode.TEMU,
+                market="US",
+                category="travel",
+            )
+        )

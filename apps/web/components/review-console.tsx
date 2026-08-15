@@ -31,6 +31,7 @@ const statusLabels: Record<AssetStatus, string> = {
   DRAFT: "草稿",
   PROCESSING: "处理中",
   REVIEW: "待审核",
+  APPROVED_FOR_SMOKE_TEST: "仅验收通过",
   APPROVED: "已通过",
   REJECTED: "已拒绝",
 };
@@ -126,7 +127,7 @@ export function ReviewConsole({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <span className="utility-face text-xs font-bold">{asset.asset_type}</span>
-                    <span className={cn("h-2 w-2 rounded-full", status === "REVIEW" ? "bg-blue-500" : status === "PROCESSING" ? "signal-pulse bg-orange-500" : status === "APPROVED" ? "bg-emerald-500" : "bg-rose-500")} />
+                    <span className={cn("h-2 w-2 rounded-full", status === "REVIEW" ? "bg-blue-500" : status === "PROCESSING" ? "signal-pulse bg-orange-500" : status === "APPROVED" ? "bg-emerald-500" : status === "APPROVED_FOR_SMOKE_TEST" ? "bg-amber-500" : "bg-rose-500")} />
                   </div>
                   <p className="mt-1 truncate text-xs text-[#778296]">{asset.label}</p>
                   <span className="mt-1 block text-[10px] text-[#9aa3b2]">{statusLabels[status]} · V{version.version_number}</span>
