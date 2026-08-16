@@ -1,7 +1,7 @@
 import io
 
 import pytest
-from app.assets.models import AssetStatus, AssetType
+from app.assets.models import AssetStatus, AssetType, AssetVersion, ContentKind
 from app.assets.service import AssetService
 from app.catalog.schemas import Dimensions, ProductCreate, SKUCreate
 from app.catalog.service import CatalogService
@@ -264,6 +264,32 @@ def test_smoke_test_approved_asset_is_not_used_for_production_template_binding(s
         )
 
 
+def test_demo_asset_is_not_used_for_production_template_binding(session):
+    product, _, _, assets, approved = product_with_assets(session)
+    demo_asset = assets.create_derived(
+        approved.id,
+        AssetType.CUTOUT,
+        png_bytes("#777777"),
+        "demo.png",
+        "image/png",
+    )
+    demo = assets.update_version_status(demo_asset.versions[0].id, AssetStatus.APPROVED)
+    demo.contains_demo_data = True
+    demo.demo_data_fields = ["product.material"]
+    session.commit()
+    resolver = TemplateBindingResolver(session)
+
+    assert resolver.approved_assets(product.id, {"{{asset.cutout}}"})[
+        "{{asset.cutout}}"
+    ].id == approved.id
+    with pytest.raises(TemplateBindingError, match="APPROVED"):
+        resolver.approved_assets(
+            product.id,
+            {"{{asset.cutout}}"},
+            {"{{asset.cutout}}": demo.id},
+        )
+
+
 def test_render_task_creates_review_version_and_traceability(session):
     product, sku, storage, _, approved = product_with_assets(session)
     template = create_template(session, "RENDER_MAIN_01")
@@ -286,3 +312,57 @@ def test_render_task_creates_review_version_and_traceability(session):
     assert output.source_version_id == approved.id
     assert storage.get(approved.object_key) == png_bytes()
     assert storage.get(output.object_key) != storage.get(approved.object_key)
+
+
+def test_detail_templates_record_content_kind_and_demo_data_fields(session):
+    product, sku, storage, _, _ = product_with_assets(session)
+    product.material = "DEMO_TEST_DATA"
+    product.dimensions = {
+        "length": 30,
+        "width": 30,
+        "unit": "cm",
+        "data_source": "DEMO_TEST_DATA",
+    }
+    product.selling_points = ["Soft texture", "Reusable", "Multi-purpose cleaning"]
+    sku.attributes = {"data_source": "DEMO_TEST_DATA"}
+    session.commit()
+    templates = {item.code: item for item in TemplateService(session).list()}
+
+    expectations = {
+        "SELLING_POINT_01": (
+            ContentKind.SELLING_POINT,
+            {"product.name", "selling_point_1", "selling_point_2", "selling_point_3"},
+        ),
+        "PARAMETER_01": (
+            ContentKind.PARAMETER,
+            {
+                "product.name",
+                "product.material",
+                "product.color",
+                "product.length",
+                "product.width",
+                "product.height",
+                "product.weight",
+                "sku.code",
+            },
+        ),
+    }
+    for code, (content_kind, expected_fields) in expectations.items():
+        job, record = TemplateRenderService(session, storage).render(
+            TemplateRenderCreate(
+                template_version_id=templates[code].latest_version.id,
+                product_id=product.id,
+                sku_id=sku.id,
+            )
+        )
+        output = session.get(AssetVersion, job.output_version_id)
+        assert output is not None
+        assert output.asset.asset_type is AssetType.DETAIL
+        assert output.asset.content_kind is content_kind
+        assert output.status is AssetStatus.REVIEW
+        assert output.contains_demo_data is True
+        assert set(output.demo_data_fields) == expected_fields
+        assert record.product_data_snapshot["data_source"] == "DEMO_TEST_DATA"
+        assert record.product_data_snapshot["contains_demo_data"] is True
+        assert job.output_metadata["content_kind"] == content_kind.value
+        assert job.output_metadata["contains_demo_data"] is True

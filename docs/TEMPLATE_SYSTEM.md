@@ -19,7 +19,12 @@ Product / SKU data + APPROVED assets + TemplateVersion
 
 `TemplateVersion` is append-only. Canvas dimensions, background, and `schema_json` are fixed on the version. Saving creates the next integer version; no API updates a historical version. Render records always reference the exact version used.
 
-Supported types are `MAIN`, `DETAIL`, `DIMENSION`, `SELLING_POINT`, `PARAMETER`, `PACKAGE`, and `COMPARE`.
+Supported template types are `MAIN`, `DETAIL`, `DIMENSION`, `SELLING_POINT`, `PARAMETER`, `PACKAGE`, and `COMPARE`. Template type describes how an image is composed; it does not create a new top-level asset type. In particular:
+
+- `SELLING_POINT_01` renders `asset_type=DETAIL`, `content_kind=SELLING_POINT`, and `template_type=SELLING_POINT`.
+- `PARAMETER_01` renders `asset_type=DETAIL`, `content_kind=PARAMETER`, and `template_type=PARAMETER`.
+
+Other supported detail semantics are `FEATURE`, `MATERIAL`, `CLOSEUP`, `COMPARE`, and `PACKAGE_INFO`. `content_kind` is invalid on any asset whose top-level type is not `DETAIL`.
 
 ## Schema
 
@@ -35,9 +40,11 @@ Text values come from a snapshot of Product and SKU data: product name, material
 
 Phase 5 does not visually measure an object. Missing measurements stay empty rather than being inferred. Dimensions, weight, and parameters are never delegated to AI.
 
+The renderer also records data provenance. If a bound field is sourced from `DEMO_TEST_DATA`, `PLACEHOLDER`, `UNKNOWN`, or `MISSING_SOURCE`, the output version stores `contains_demo_data=true` and the exact binding paths in `demo_data_fields`. The same provenance is preserved in the render snapshot and generation output metadata.
+
 ## Asset selection and truthfulness
 
-Only non-deleted `APPROVED` AssetVersions belonging to the selected Product may be bound. Explicit bindings with any other status fail. Automatic preference is:
+Production template selection only accepts non-deleted `APPROVED` AssetVersions belonging to the selected Product and having `contains_demo_data=false`. Explicit production bindings that contain non-production data fail. Automatic preference is:
 
 1. CUTOUT, then MAIN for product cutouts
 2. MAIN, then CUTOUT for main imagery
@@ -45,6 +52,8 @@ Only non-deleted `APPROVED` AssetVersions belonging to the selected Product may 
 4. PACKAGE, then CUTOUT, then MAIN for package imagery
 
 The renderer never overwrites source bytes. Layout, contain/cover/manual positioning, crop, rotation, text, lines, background, icons, and auxiliary shapes are permitted. Product color, texture, shape, Logo, and packaging text may not change.
+
+Demo and placeholder outputs may remain in `REVIEW` or be marked `APPROVED_FOR_SMOKE_TEST`. They cannot become production `APPROVED`, cannot be selected by production VisualPlan/template automation, and cannot enter a formal platform ZIP export.
 
 ## Render pipeline
 
@@ -54,7 +63,7 @@ Success creates a derived Asset or appends to the Asset assigned to a slot. Ever
 
 ## Traceability
 
-`TemplateRenderRecord` links Template, exact TemplateVersion, GenerationJob, output AssetVersion, Product/SKU, all source AssetVersions, the product data snapshot, and render time. An exported image can therefore be audited after product data or the active template changes.
+`TemplateRenderRecord` links Template, exact TemplateVersion, GenerationJob, output AssetVersion, Product/SKU, all source AssetVersions, the product data snapshot (including provenance), and render time. An exported image can therefore be audited after product data or the active template changes. ZIP manifests also carry the detail `content_kind`; assets marked with demo data are omitted from production exports.
 
 ## VisualPlan integration
 

@@ -28,6 +28,7 @@ def test_asset_and_version_crud_api(client):
         f"/api/v1/products/{product['id']}/assets",
         data={
             "asset_type": "DETAIL",
+            "content_kind": "FEATURE",
             "source_version_id": source_id,
             "label": "Detail crop",
         },
@@ -35,8 +36,11 @@ def test_asset_and_version_crud_api(client):
     )
     assert derived_response.status_code == 201
     derived = derived_response.json()
+    assert derived["content_kind"] == "FEATURE"
     version_id = derived["versions"][0]["id"]
     assert derived["versions"][0]["status"] == "REVIEW"
+    assert derived["versions"][0]["contains_demo_data"] is False
+    assert derived["versions"][0]["demo_data_fields"] == []
 
     updated = client.patch(f"/api/v1/assets/{derived['id']}", json={"label": "Handle detail"})
     assert updated.status_code == 200

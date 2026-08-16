@@ -44,6 +44,10 @@ class ReviewService:
         )
         if job is None or job.status is not JobStatus.COMPLETED:
             raise ReviewInvariantError("only completed generation outputs can be reviewed")
+        if data.decision is ReviewDecision.APPROVED and version.contains_demo_data:
+            raise ReviewInvariantError(
+                "assets containing demo or placeholder data cannot be production approved"
+            )
         if (
             data.decision is ReviewDecision.APPROVED
             and job.validation_status is not ValidationStatus.PASSED

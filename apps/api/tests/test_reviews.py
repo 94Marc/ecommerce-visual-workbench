@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 
 import pytest
-from app.assets.models import AssetStatus, AssetVersion
+from app.assets.models import AssetStatus, AssetType, AssetVersion, ContentKind
 from app.assets.service import AssetService
 from app.catalog.schemas import ProductCreate
 from app.catalog.service import CatalogService
@@ -82,6 +82,39 @@ def test_smoke_approval_is_distinct_from_production_approval(session):
 
     assert result.review.decision is ReviewDecision.APPROVED_FOR_SMOKE_TEST
     assert session.get(AssetVersion, output_id).status is AssetStatus.APPROVED_FOR_SMOKE_TEST
+
+
+@pytest.mark.parametrize(
+    "content_kind", [ContentKind.PARAMETER, ContentKind.SELLING_POINT]
+)
+def test_demo_detail_can_only_receive_smoke_approval(session, content_kind):
+    storage = MemoryObjectStorage()
+    dispatcher = MemoryJobDispatcher()
+    output_id, _ = completed_output(session, storage, dispatcher)
+    output = session.get(AssetVersion, output_id)
+    output.asset.asset_type = AssetType.DETAIL
+    output.asset.content_kind = content_kind
+    output.contains_demo_data = True
+    output.demo_data_fields = ["product.material"]
+    session.commit()
+    reviews = ReviewService(session, dispatcher)
+
+    with pytest.raises(ReviewInvariantError, match="cannot be production approved"):
+        reviews.decide(
+            output_id,
+            ReviewCreate(decision=ReviewDecision.APPROVED, reviewer="QA"),
+        )
+
+    result = reviews.decide(
+        output_id,
+        ReviewCreate(
+            decision=ReviewDecision.APPROVED_FOR_SMOKE_TEST,
+            reviewer="QA",
+            comment="Demo data is permitted only in the smoke workflow.",
+        ),
+    )
+    assert result.review.decision is ReviewDecision.APPROVED_FOR_SMOKE_TEST
+    assert output.status is AssetStatus.APPROVED_FOR_SMOKE_TEST
 
 
 def test_regenerate_creates_new_pending_job_from_original_source(session):

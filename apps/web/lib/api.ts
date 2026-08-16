@@ -23,6 +23,15 @@ export const assetStatuses = [
 export type AssetType = (typeof assetTypes)[number];
 export type AssetStatus = (typeof assetStatuses)[number];
 
+export type ContentKind =
+  | "SELLING_POINT"
+  | "PARAMETER"
+  | "FEATURE"
+  | "MATERIAL"
+  | "CLOSEUP"
+  | "COMPARE"
+  | "PACKAGE_INFO";
+
 export type Product = {
   id: string;
   name: string;
@@ -50,6 +59,8 @@ export type AssetVersion = {
   checksum_sha256: string;
   source_version_id: string | null;
   status: AssetStatus;
+  contains_demo_data: boolean;
+  demo_data_fields: string[];
   is_deleted: boolean;
   created_at: string;
 };
@@ -59,6 +70,7 @@ export type Asset = {
   product_id: string;
   sku_id: string | null;
   asset_type: AssetType;
+  content_kind: ContentKind | null;
   label: string | null;
   is_archived: boolean;
   versions: AssetVersion[];
@@ -301,6 +313,7 @@ export const demoAssets: Asset[] = assetTypes.map((assetType, index) => ({
   product_id: "demo-kettle",
   sku_id: index < 2 ? "demo-sku" : null,
   asset_type: assetType,
+  content_kind: null,
   label:
     assetType === "ORIGINAL"
       ? "供应商正面原图"
@@ -321,6 +334,8 @@ export const demoAssets: Asset[] = assetTypes.map((assetType, index) => ({
       checksum_sha256: `${index}`.repeat(64),
       source_version_id: assetType === "ORIGINAL" ? null : "version-original-1",
       status: demoStatuses[index],
+      contains_demo_data: false,
+      demo_data_fields: [],
       is_deleted: false,
       created_at: `2026-08-10T0${Math.min(index, 9)}:20:00Z`,
     },
@@ -339,6 +354,8 @@ export const demoAssets: Asset[] = assetTypes.map((assetType, index) => ({
             checksum_sha256: `${index + 1}`.repeat(64).slice(0, 64),
             source_version_id: `version-${assetType.toLowerCase()}-1`,
             status: demoStatuses[index],
+            contains_demo_data: false,
+            demo_data_fields: [],
             is_deleted: false,
             created_at: "2026-08-10T10:20:00Z",
           } satisfies AssetVersion,

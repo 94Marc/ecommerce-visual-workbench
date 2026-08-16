@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.assets.models import Asset, AssetStatus, AssetType, AssetVersion
+from app.assets.models import Asset, AssetStatus, AssetType, AssetVersion, ContentKind
 from app.assets.storage import ObjectStorage
 from app.catalog.models import SKU, Product
 from app.core.models import utc_now
@@ -62,9 +62,13 @@ class AssetService:
         status: AssetStatus = AssetStatus.REVIEW,
         label: str | None = None,
         asset_slot_id: uuid.UUID | None = None,
+        content_kind: ContentKind | None = None,
+        contains_demo_data: bool = False,
+        demo_data_fields: list[str] | None = None,
     ) -> Asset:
         if asset_type is AssetType.ORIGINAL:
             raise AssetInvariantError("derived assets cannot use ORIGINAL type")
+        self._validate_content_kind(asset_type, content_kind)
         source = self.session.get(AssetVersion, source_version_id)
         if source is None:
             raise AssetNotFoundError(f"asset version {source_version_id} not found")
@@ -72,6 +76,7 @@ class AssetService:
             product_id=source.asset.product_id,
             sku_id=source.asset.sku_id,
             asset_type=asset_type,
+            content_kind=content_kind,
             label=label,
             asset_slot_id=asset_slot_id,
         )
@@ -86,6 +91,8 @@ class AssetService:
             width=width,
             height=height,
             status=status,
+            contains_demo_data=contains_demo_data,
+            demo_data_fields=demo_data_fields,
         )
         self.session.commit()
         return self.get_asset(asset.id)
@@ -100,6 +107,8 @@ class AssetService:
         status: AssetStatus = AssetStatus.DRAFT,
         width: int | None = None,
         height: int | None = None,
+        contains_demo_data: bool = False,
+        demo_data_fields: list[str] | None = None,
     ) -> AssetVersion:
         asset = self.get_asset(asset_id)
         if asset.asset_type is AssetType.ORIGINAL:
@@ -120,6 +129,8 @@ class AssetService:
             status=status,
             width=width,
             height=height,
+            contains_demo_data=contains_demo_data,
+            demo_data_fields=demo_data_fields,
         )
         self.session.commit()
         self.session.refresh(version)
@@ -142,11 +153,17 @@ class AssetService:
         return list(self.session.scalars(statement).unique())
 
     def update_asset(
-        self, asset_id: uuid.UUID, *, label: str | None, asset_slot_id: uuid.UUID | None = None
+        self,
+        asset_id: uuid.UUID,
+        *,
+        label: str | None,
+        asset_slot_id: uuid.UUID | None = None,
+        content_kind: ContentKind | None = None,
     ) -> Asset:
         asset = self.get_asset(asset_id)
         if asset.asset_type is AssetType.ORIGINAL:
             raise AssetInvariantError("ORIGINAL assets are immutable")
+        self._validate_content_kind(asset.asset_type, content_kind)
         if asset_slot_id is not None:
             from app.plans.models import AssetSlot
 
@@ -159,6 +176,7 @@ class AssetService:
                 raise AssetInvariantError("asset slot belongs to a different product")
         asset.label = label
         asset.asset_slot_id = asset_slot_id
+        asset.content_kind = content_kind
         self.session.commit()
         return self.get_asset(asset_id)
 
@@ -190,6 +208,10 @@ class AssetService:
         version = self.get_version(version_id)
         if version.asset.asset_type is AssetType.ORIGINAL:
             raise AssetInvariantError("ORIGINAL versions are immutable")
+        if status is AssetStatus.APPROVED and version.contains_demo_data:
+            raise AssetInvariantError(
+                "assets containing demo or placeholder data cannot be production approved"
+            )
         allowed = {
             AssetStatus.DRAFT: {AssetStatus.PROCESSING, AssetStatus.REVIEW},
             AssetStatus.PROCESSING: {AssetStatus.REVIEW, AssetStatus.REJECTED},
@@ -239,6 +261,8 @@ class AssetService:
         width: int | None = None,
         height: int | None = None,
         status: AssetStatus = AssetStatus.DRAFT,
+        contains_demo_data: bool = False,
+        demo_data_fields: list[str] | None = None,
     ) -> AssetVersion:
         next_version = (
             self.session.scalar(
@@ -267,6 +291,8 @@ class AssetService:
             checksum_sha256=checksum,
             source_version_id=source_version_id,
             status=status,
+            contains_demo_data=contains_demo_data,
+            demo_data_fields=sorted(set(demo_data_fields or [])),
         )
         self.session.add(version)
         self.session.flush()
@@ -279,3 +305,10 @@ class AssetService:
             sku = self.session.get(SKU, sku_id)
             if sku is None or sku.product_id != product_id:
                 raise AssetInvariantError("SKU must belong to the product")
+
+    @staticmethod
+    def _validate_content_kind(
+        asset_type: AssetType, content_kind: ContentKind | None
+    ) -> None:
+        if content_kind is not None and asset_type is not AssetType.DETAIL:
+            raise AssetInvariantError("content_kind is only valid for DETAIL assets")

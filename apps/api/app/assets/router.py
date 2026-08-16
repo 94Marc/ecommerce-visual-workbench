@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy.orm import Session
 
-from app.assets.models import AssetType
+from app.assets.models import AssetType, ContentKind
 from app.assets.schemas import AssetRead, AssetUpdate, AssetVersionRead, AssetVersionUpdate
 from app.assets.service import AssetInvariantError, AssetNotFoundError, AssetService
 from app.assets.storage import ObjectStorage, get_object_storage
@@ -99,11 +99,14 @@ async def create_asset(
     source_version_id: Annotated[uuid.UUID | None, Form()] = None,
     sku_id: Annotated[uuid.UUID | None, Form()] = None,
     label: Annotated[str | None, Form()] = None,
+    content_kind: Annotated[ContentKind | None, Form()] = None,
     assets: AssetService = Depends(service),
 ):
     image = await read_image(file)
     try:
         if asset_type is AssetType.ORIGINAL:
+            if content_kind is not None:
+                raise AssetInvariantError("content_kind is only valid for DETAIL assets")
             return assets.create_original(
                 product_id,
                 image.content,
@@ -126,6 +129,7 @@ async def create_asset(
             file.filename or "processed.bin",
             image.mime_type,
             label=label,
+            content_kind=content_kind,
             width=image.width,
             height=image.height,
         )
@@ -157,7 +161,17 @@ def update_asset(asset_id: uuid.UUID, data: AssetUpdate, assets: AssetService = 
             if "asset_slot_id" in data.model_fields_set
             else assets.get_asset(asset_id).asset_slot_id
         )
-        return assets.update_asset(asset_id, label=data.label, asset_slot_id=current_slot_id)
+        current_content_kind = (
+            data.content_kind
+            if "content_kind" in data.model_fields_set
+            else assets.get_asset(asset_id).content_kind
+        )
+        return assets.update_asset(
+            asset_id,
+            label=data.label,
+            asset_slot_id=current_slot_id,
+            content_kind=current_content_kind,
+        )
     except AssetNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except AssetInvariantError as exc:

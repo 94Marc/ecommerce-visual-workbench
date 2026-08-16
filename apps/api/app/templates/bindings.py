@@ -93,6 +93,7 @@ class TemplateBindingResolver:
                 version is None
                 or version.is_deleted
                 or version.status is not AssetStatus.APPROVED
+                or version.contains_demo_data
                 or version.asset.product_id != product_id
             ):
                 raise TemplateBindingError(
@@ -108,6 +109,7 @@ class TemplateBindingResolver:
                     Asset.product_id == product_id,
                     Asset.is_archived.is_(False),
                     AssetVersion.status == AssetStatus.APPROVED,
+                    AssetVersion.contains_demo_data.is_(False),
                     AssetVersion.is_deleted.is_(False),
                 )
                 .order_by(AssetVersion.created_at.desc())

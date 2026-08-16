@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from app.assets.models import AssetStatus, AssetType
+from app.assets.models import AssetStatus, AssetType, ContentKind
 from app.assets.service import AssetInvariantError, AssetService
 from app.catalog.schemas import ProductCreate
 from app.catalog.service import CatalogService
@@ -50,6 +50,55 @@ def test_processing_creates_new_asset_and_version(session):
     assert storage.get(source.object_key) == b"raw"
     assert storage.get(derived.versions[0].object_key) == b"processed"
     assert source.object_key != derived.versions[0].object_key
+
+
+def test_detail_content_kind_and_demo_data_cannot_be_production_approved(session):
+    storage = MemoryObjectStorage()
+    product = CatalogService(session).create_product(
+        ProductCreate(name="Demo cloth", category="cleaning")
+    )
+    assets = AssetService(session, storage)
+    source = assets.create_original(product.id, b"raw", "raw.png", "image/png")
+    detail = assets.create_derived(
+        source.versions[0].id,
+        AssetType.DETAIL,
+        b"parameter",
+        "parameter.png",
+        "image/png",
+        content_kind=ContentKind.PARAMETER,
+        contains_demo_data=True,
+        demo_data_fields=["product.material", "product.width"],
+    )
+    version = detail.versions[0]
+
+    assert detail.content_kind is ContentKind.PARAMETER
+    assert version.contains_demo_data is True
+    assert version.demo_data_fields == ["product.material", "product.width"]
+    with pytest.raises(AssetInvariantError, match="cannot be production approved"):
+        assets.update_version_status(version.id, AssetStatus.APPROVED)
+    assert (
+        assets.update_version_status(version.id, AssetStatus.APPROVED_FOR_SMOKE_TEST).status
+        is AssetStatus.APPROVED_FOR_SMOKE_TEST
+    )
+
+
+def test_content_kind_is_restricted_to_detail_assets(session):
+    storage = MemoryObjectStorage()
+    product = CatalogService(session).create_product(
+        ProductCreate(name="Demo cloth", category="cleaning")
+    )
+    assets = AssetService(session, storage)
+    source = assets.create_original(product.id, b"raw", "raw.png", "image/png")
+
+    with pytest.raises(AssetInvariantError, match="only valid for DETAIL"):
+        assets.create_derived(
+            source.versions[0].id,
+            AssetType.COMPARE,
+            b"selling",
+            "selling.png",
+            "image/png",
+            content_kind=ContentKind.SELLING_POINT,
+        )
 
 
 def test_original_chain_rejects_processed_versions(session):

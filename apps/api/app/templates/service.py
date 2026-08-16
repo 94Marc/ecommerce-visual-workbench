@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import time
 import uuid
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.assets.models import Asset, AssetStatus, AssetType, AssetVersion
+from app.assets.models import Asset, AssetStatus, AssetType, AssetVersion, ContentKind
 from app.assets.service import AssetService
 from app.assets.storage import ObjectStorage
 from app.catalog.models import SKU, Product
@@ -26,7 +27,11 @@ from app.plans.models import AssetSlot
 from app.rules.models import ImageSlot, Platform, PlatformCode, RuleVersion
 from app.rules.schemas import ImageProbe
 from app.rules.service import RuleNotFoundError, RuleService
-from app.templates.bindings import TemplateBindingError, TemplateBindingResolver
+from app.templates.bindings import (
+    VARIABLE_PATTERN,
+    TemplateBindingError,
+    TemplateBindingResolver,
+)
 from app.templates.demos import DEMO_TEMPLATES
 from app.templates.models import (
     Template,
@@ -204,6 +209,12 @@ class TemplateService:
 
 
 class TemplateRenderService:
+    NON_PRODUCTION_DATA_SOURCES = {
+        "DEMO_TEST_DATA",
+        "PLACEHOLDER",
+        "UNKNOWN",
+        "MISSING_SOURCE",
+    }
     TYPE_TO_TASK = {
         TemplateType.MAIN: TaskType.RENDER_MAIN_TEMPLATE,
         TemplateType.DIMENSION: TaskType.RENDER_DIMENSION_TEMPLATE,
@@ -217,10 +228,15 @@ class TemplateRenderService:
         TemplateType.MAIN: AssetType.MAIN,
         TemplateType.DIMENSION: AssetType.DIMENSION,
         TemplateType.DETAIL: AssetType.DETAIL,
-        TemplateType.SELLING_POINT: AssetType.COMPARE,
+        TemplateType.SELLING_POINT: AssetType.DETAIL,
         TemplateType.PARAMETER: AssetType.DETAIL,
         TemplateType.PACKAGE: AssetType.PACKAGE,
         TemplateType.COMPARE: AssetType.COMPARE,
+    }
+    TYPE_TO_CONTENT_KIND = {
+        TemplateType.DETAIL: ContentKind.CLOSEUP,
+        TemplateType.SELLING_POINT: ContentKind.SELLING_POINT,
+        TemplateType.PARAMETER: ContentKind.PARAMETER,
     }
 
     def __init__(self, session: Session, storage: ObjectStorage):
@@ -247,6 +263,8 @@ class TemplateRenderService:
         source_versions = list({item.id: item for item in assets.values()}.values())
         source = source_versions[0]
         snapshot = self.bindings.product_snapshot(product, sku)
+        provenance = self._data_provenance(product, sku, document.layers, snapshot)
+        snapshot = {**snapshot, **provenance}
         task_type = self.TYPE_TO_TASK[version.template.template_type]
         started_at = utc_now()
         job = GenerationJob(
@@ -266,6 +284,9 @@ class TemplateRenderService:
                 "template_id": str(version.template_id),
                 "template_version_id": str(version.id),
                 "output_format": data.output_format,
+                "data_source": provenance["data_source"],
+                "contains_demo_data": provenance["contains_demo_data"],
+                "demo_data_fields": provenance["demo_data_fields"],
             },
             provider="template",
             provider_type=ProviderType.TEMPLATE,
@@ -301,7 +322,9 @@ class TemplateRenderService:
                 edge_cleanup=data.edge_cleanup,
                 tone_correction=data.tone_correction,
             )
-            output = self._persist_output(data, version, source, rendered)
+            output = self._persist_output(
+                data, version, source, rendered, provenance
+            )
         except Exception as exc:
             job.status = JobStatus.FAILED
             job.failure_code = "template_render_error"
@@ -359,6 +382,12 @@ class TemplateRenderService:
             "mime_type": rendered.mime_type,
             "byte_size": len(rendered.content),
             "source_asset_version_ids": [str(item.id) for item in source_versions],
+            "content_kind": (
+                output.asset.content_kind.value if output.asset.content_kind else None
+            ),
+            "data_source": provenance["data_source"],
+            "contains_demo_data": provenance["contains_demo_data"],
+            "demo_data_fields": provenance["demo_data_fields"],
             "render_postprocessing": rendered.metadata,
             "rule_result": job.validation_result,
         }
@@ -383,9 +412,17 @@ class TemplateRenderService:
         self.session.refresh(record)
         return job, record
 
-    def _persist_output(self, data, version, source, rendered) -> AssetVersion:
+    def _persist_output(
+        self,
+        data,
+        version,
+        source,
+        rendered,
+        provenance: dict[str, Any],
+    ) -> AssetVersion:
         assets = AssetService(self.session, self.storage)
         asset_type = self.TYPE_TO_ASSET[version.template.template_type]
+        content_kind = self.TYPE_TO_CONTENT_KIND.get(version.template.template_type)
         existing = None
         if data.asset_slot_id:
             slot = self.session.get(AssetSlot, data.asset_slot_id)
@@ -395,7 +432,14 @@ class TemplateRenderService:
                 raise TemplateInvariantError("asset slot is bound to a different template")
             existing = self.session.scalar(select(Asset).where(Asset.asset_slot_id == slot.id))
             asset_type = AssetType(self._value(slot.image_type))
+        if asset_type is not AssetType.DETAIL:
+            content_kind = None
         if existing:
+            if existing.content_kind not in {None, content_kind}:
+                raise TemplateInvariantError(
+                    "existing asset content_kind does not match the selected template"
+                )
+            existing.content_kind = content_kind
             return assets.append_processed_version(
                 existing.id,
                 source.id,
@@ -405,6 +449,8 @@ class TemplateRenderService:
                 status=AssetStatus.REVIEW,
                 width=rendered.width,
                 height=rendered.height,
+                contains_demo_data=provenance["contains_demo_data"],
+                demo_data_fields=provenance["demo_data_fields"],
             )
         derived = assets.create_derived(
             source.id,
@@ -417,6 +463,9 @@ class TemplateRenderService:
             status=AssetStatus.REVIEW,
             label=f"{version.template.code} 模板成品",
             asset_slot_id=data.asset_slot_id,
+            content_kind=content_kind,
+            contains_demo_data=provenance["contains_demo_data"],
+            demo_data_fields=provenance["demo_data_fields"],
         )
         return derived.versions[-1]
 
@@ -461,6 +510,74 @@ class TemplateRenderService:
             if layer.children and cls._has_text(layer.children):
                 return True
         return False
+
+    @classmethod
+    def _data_provenance(
+        cls,
+        product: Product,
+        sku: SKU | None,
+        layers,
+        snapshot: dict[str, Any],
+    ) -> dict[str, Any]:
+        bound_fields = cls._text_bindings(layers)
+        demo_fields: set[str] = set()
+        data_sources: set[str] = set()
+        dimensions = product.dimensions or {}
+        sku_attributes = sku.attributes if sku else {}
+
+        global_sources = {
+            str(value).upper()
+            for value in (
+                dimensions.get("data_source"),
+                sku_attributes.get("data_source"),
+            )
+            if value
+        }
+        blocked_global = global_sources & cls.NON_PRODUCTION_DATA_SOURCES
+        if blocked_global:
+            data_sources.update(blocked_global)
+            demo_fields.update(bound_fields)
+
+        measurement_source = str(dimensions.get("measurement_source") or "").upper()
+        if measurement_source in cls.NON_PRODUCTION_DATA_SOURCES:
+            data_sources.add(measurement_source)
+            demo_fields.update(
+                bound_fields & {"product.length", "product.width", "product.height"}
+            )
+
+        for path in bound_fields:
+            value = cls._snapshot_value(snapshot, path)
+            marker = str(value).upper() if value is not None else ""
+            if marker in cls.NON_PRODUCTION_DATA_SOURCES:
+                data_sources.add(marker)
+                demo_fields.add(path)
+
+        ordered_sources = sorted(data_sources)
+        return {
+            "data_source": ordered_sources[0] if ordered_sources else None,
+            "data_sources": ordered_sources,
+            "contains_demo_data": bool(demo_fields),
+            "demo_data_fields": sorted(demo_fields),
+        }
+
+    @classmethod
+    def _text_bindings(cls, layers) -> set[str]:
+        result: set[str] = set()
+        for layer in layers:
+            if layer.visible and layer.type is LayerType.TEXT and layer.text:
+                result.update(VARIABLE_PATTERN.findall(layer.text))
+            if layer.children:
+                result.update(cls._text_bindings(layer.children))
+        return result
+
+    @staticmethod
+    def _snapshot_value(snapshot: dict[str, Any], path: str) -> Any:
+        value: Any = snapshot
+        for part in path.split("."):
+            if not isinstance(value, dict) or part not in value:
+                return None
+            value = value[part]
+        return value
 
     @staticmethod
     def _value(value) -> str:

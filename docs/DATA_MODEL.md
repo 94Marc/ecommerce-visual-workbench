@@ -39,6 +39,8 @@ erDiagram
 
 Asset 表示图片用途和版本链根；AssetVersion 表示不可变文件。版本包含 object_key、mime_type、byte_size、width、height、checksum_sha256、source_version_id 与 created_at。`ORIGINAL` 资产的首版本由上传创建，应用层不提供更新与删除能力。
 
+详情类图片统一使用顶层 `asset_type=DETAIL`，并用可空 `content_kind` 区分 `SELLING_POINT`、`PARAMETER`、`FEATURE`、`MATERIAL`、`CLOSEUP`、`COMPARE`、`PACKAGE_INFO`；非 DETAIL 资产禁止设置该字段。AssetVersion 另保存 `contains_demo_data` 与 `demo_data_fields JSON`，追踪模板实际绑定的非生产字段。
+
 ### platforms / platform_markets / platform_categories
 
 平台、市场和类目采用独立实体与稳定 UUID。`code` 是规则解析键；`*` 表示市场或类目通配层级。
@@ -65,11 +67,13 @@ PlatformRule 唯一键为 `(category_id, image_slot, image_type)`。RuleVersion 
 
 ### export_bundles
 
-记录平台上下文、object_key、manifest、checksum、status 与创建时间。manifest 固化实际文件名和版本 ID。
+记录平台上下文、object_key、manifest、checksum、status 与创建时间。manifest 固化实际文件名、版本 ID 与详情 `content_kind`。正式导出只接收完成审核且规则通过的生产级 `APPROVED` 版本；`contains_demo_data=true` 的版本一律排除。
 
 ### templates / template_versions
 
 Template 保存稳定 code、类型、状态和预览资产。TemplateVersion 以 `(template_id, version)` 唯一，固定画布、背景与 JSON Schema；历史版本无更新 API。
+
+模板绑定会解析 Product/SKU 数据来源。`DEMO_TEST_DATA`、`PLACEHOLDER`、`UNKNOWN`、`MISSING_SOURCE` 均属于非生产来源：对应输出允许 `REVIEW` 和 `APPROVED_FOR_SMOKE_TEST`，禁止生产级 `APPROVED`、生产 VisualPlan 自动选用与正式 ZIP 导出。
 
 ### template_render_records
 
@@ -78,6 +82,6 @@ Template 保存稳定 code、类型、状态和预览资产。TemplateVersion �
 ## 索引
 
 - Product：category；SKU：product_id、code。
-- Asset：product_id、sku_id、asset_type；AssetVersion：asset_id + version_number。
+- Asset：product_id、sku_id、asset_type、content_kind；AssetVersion：asset_id + version_number、contains_demo_data。
 - PlatformRule：解析复合键 + effective_date DESC。
 - GenerationJob：status、task_type、workflow_definition_id + created_at；Review：asset_version_id + created_at DESC。

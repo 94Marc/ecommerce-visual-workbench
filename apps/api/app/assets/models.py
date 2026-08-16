@@ -3,6 +3,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     DateTime,
@@ -40,6 +41,16 @@ class AssetStatus(StrEnum):
     REJECTED = "REJECTED"
 
 
+class ContentKind(StrEnum):
+    SELLING_POINT = "SELLING_POINT"
+    PARAMETER = "PARAMETER"
+    FEATURE = "FEATURE"
+    MATERIAL = "MATERIAL"
+    CLOSEUP = "CLOSEUP"
+    COMPARE = "COMPARE"
+    PACKAGE_INFO = "PACKAGE_INFO"
+
+
 class Asset(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "assets"
 
@@ -53,6 +64,9 @@ class Asset(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("asset_slots.id", ondelete="SET NULL"), nullable=True, unique=True
     )
     asset_type: Mapped[AssetType] = mapped_column(Enum(AssetType), index=True)
+    content_kind: Mapped[ContentKind | None] = mapped_column(
+        Enum(ContentKind), nullable=True, index=True
+    )
     label: Mapped[str | None] = mapped_column(String(200), nullable=True)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -86,6 +100,8 @@ class AssetVersion(UUIDPrimaryKeyMixin, Base):
     status: Mapped[AssetStatus] = mapped_column(
         Enum(AssetStatus), default=AssetStatus.DRAFT, index=True
     )
+    contains_demo_data: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    demo_data_fields: Mapped[list[str]] = mapped_column(JSON, default=list)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

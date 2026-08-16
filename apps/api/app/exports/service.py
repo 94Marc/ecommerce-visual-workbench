@@ -64,6 +64,7 @@ class ExportService:
                 continue
             if (
                 version.status is AssetStatus.APPROVED
+                and not version.contains_demo_data
                 and reviews.latest_decision(version.id) is ReviewDecision.APPROVED
             ):
                 approved.append((job, version))
@@ -96,6 +97,11 @@ class ExportService:
                         "asset_id": str(version.asset_id),
                         "asset_version_id": str(version.id),
                         "asset_type": version.asset.asset_type.value,
+                        "content_kind": (
+                            version.asset.content_kind.value
+                            if version.asset.content_kind
+                            else None
+                        ),
                         "image_slot": job.image_slot.value,
                         "asset_slot_id": str(job.asset_slot_id) if job.asset_slot_id else None,
                         "visual_plan_id": str(job.visual_plan_id) if job.visual_plan_id else None,
@@ -171,6 +177,7 @@ class ExportService:
                 Asset.asset_type == AssetType.PACKAGE,
                 Asset.is_archived.is_(False),
                 AssetVersion.status == AssetStatus.APPROVED,
+                AssetVersion.contains_demo_data.is_(False),
                 AssetVersion.is_deleted.is_(False),
             )
             .limit(1)

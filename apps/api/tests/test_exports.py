@@ -4,6 +4,7 @@ import zipfile
 from datetime import date
 
 import pytest
+from app.assets.models import AssetType, AssetVersion, ContentKind
 from app.assets.service import AssetService
 from app.catalog.schemas import ProductCreate
 from app.catalog.service import CatalogService
@@ -112,6 +113,35 @@ def test_export_excludes_smoke_test_approved_assets(session):
             comment="Smoke-test workflow only.",
         ),
     )
+
+    with pytest.raises(ExportInvariantError, match="no approved"):
+        ExportService(session, storage).create_bundle(
+            ExportCreate(
+                product_id=product.id,
+                platform=PlatformCode.TEMU,
+                market="US",
+                category="travel",
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    "content_kind", [ContentKind.PARAMETER, ContentKind.SELLING_POINT]
+)
+def test_export_excludes_legacy_approved_demo_detail_assets(session, content_kind):
+    storage = MemoryObjectStorage()
+    dispatcher = MemoryJobDispatcher()
+    product, output_id = generated_scope(session, storage, dispatcher)
+    ReviewService(session, dispatcher).decide(
+        output_id,
+        ReviewCreate(decision=ReviewDecision.APPROVED, reviewer="Legacy reviewer"),
+    )
+    output = session.get(AssetVersion, output_id)
+    output.asset.asset_type = AssetType.DETAIL
+    output.asset.content_kind = content_kind
+    output.contains_demo_data = True
+    output.demo_data_fields = ["product.material"]
+    session.commit()
 
     with pytest.raises(ExportInvariantError, match="no approved"):
         ExportService(session, storage).create_bundle(

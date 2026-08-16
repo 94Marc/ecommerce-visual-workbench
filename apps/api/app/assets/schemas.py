@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.assets.models import AssetStatus, AssetType
+from app.assets.models import AssetStatus, AssetType, ContentKind
 
 
 class AssetVersionRead(BaseModel):
@@ -21,6 +21,8 @@ class AssetVersionRead(BaseModel):
     checksum_sha256: str
     source_version_id: uuid.UUID | None
     status: AssetStatus
+    contains_demo_data: bool
+    demo_data_fields: list[str]
     is_deleted: bool
     deleted_at: datetime | None
     created_at: datetime
@@ -34,6 +36,7 @@ class AssetRead(BaseModel):
     sku_id: uuid.UUID | None
     asset_slot_id: uuid.UUID | None
     asset_type: AssetType
+    content_kind: ContentKind | None
     label: str | None
     is_archived: bool
     archived_at: datetime | None
@@ -44,6 +47,7 @@ class AssetRead(BaseModel):
 class AssetUpdate(BaseModel):
     label: str | None = Field(default=None, max_length=200)
     asset_slot_id: uuid.UUID | None = None
+    content_kind: ContentKind | None = None
 
 
 class AssetVersionUpdate(BaseModel):
