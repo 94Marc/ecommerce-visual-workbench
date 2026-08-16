@@ -253,12 +253,36 @@ export const demoTemplates: EcommerceTemplate[] = [
     {id: "width-line", type: "LINE", x: 250, y: 1280, width: 1100, height: 0, rotation: 0, opacity: 1, visible: true, locked: false, zIndex: 2, points: [0, 0, 1100, 0], stroke: "#172033", strokeWidth: 3, arrowStart: true, arrowEnd: true},
   ]),
   demoTemplate("template-selling", "SELLING_POINT_01", "三个核心卖点", "SELLING_POINT", [
-    {...productLayer, width: 850, x: 650}, titleLayer,
-    ...[1, 2, 3].map((index) => ({id: `point-${index}`, type: "TEXT" as const, x: 130, y: 430 + index * 180, width: 500, height: 100, rotation: 0, opacity: 1, visible: true, locked: false, zIndex: 3, text: `0${index}  {{selling_point_${index}}}`, fontSize: 34, fontFamily: "Arial", fontWeight: "bold" as const, align: "left" as const, lineHeight: 1.2, fill: "#172033"})),
+    {...productLayer, x: 60, y: 280, width: 800, height: 1040},
+    {...titleLayer, id: "eyebrow", x: 900, y: 205, width: 600, height: 50, text: "PRODUCT HIGHLIGHTS", fontSize: 22, align: "left", fill: "#a26332"},
+    {...titleLayer, x: 900, y: 260, width: 610, height: 130, fontSize: 52, align: "left"},
+    {id: "title-rule", type: "LINE", x: 900, y: 405, width: 560, height: 0, rotation: 0, opacity: 1, visible: true, locked: false, zIndex: 2, points: [0, 0, 560, 0], stroke: "#d6d9d5", strokeWidth: 2},
+    ...[1, 2, 3].flatMap((index) => {
+      const y = 515 + (index - 1) * 230;
+      return [
+        {id: `number-${index}`, type: "TEXT" as const, x: 900, y, width: 90, height: 80, rotation: 0, opacity: 1, visible: true, locked: false, zIndex: 2, text: `0${index}`, fontSize: 62, fontFamily: "Arial", fontWeight: "bold" as const, align: "left" as const, lineHeight: 1, fill: "#c6a174"},
+        {id: `point-${index}-title`, type: "TEXT" as const, x: 1015, y: y + 10, width: 480, height: 55, rotation: 0, opacity: 1, visible: true, locked: false, zIndex: 2, text: `{{selling_point_${index}}}`, fontSize: 38, fontFamily: "Arial", fontWeight: "bold" as const, align: "left" as const, lineHeight: 1.2, fill: "#202a3f"},
+        {id: `point-${index}-description`, type: "TEXT" as const, x: 1015, y: y + 85, width: 480, height: 45, rotation: 0, opacity: 1, visible: true, locked: false, zIndex: 2, text: `{{sku.selling_point_description_${index}}}`, fontSize: 24, fontFamily: "Arial", fontWeight: "normal" as const, align: "left" as const, lineHeight: 1.2, fill: "#687184"},
+        ...(index < 3 ? [{id: `point-${index}-rule`, type: "LINE" as const, x: 1015, y: y + 165, width: 480, height: 0, rotation: 0, opacity: 1, visible: true, locked: false, zIndex: 2, points: [0, 0, 480, 0], stroke: "#e1e3df", strokeWidth: 2}] : []),
+      ];
+    }),
   ]),
   demoTemplate("template-parameter", "PARAMETER_01", "产品参数展示", "PARAMETER", [
-    {...productLayer, width: 720, height: 760, x: 800, y: 330}, titleLayer,
-    {...titleLayer, id: "params", x: 140, y: 500, width: 560, height: 500, text: "材质  {{product.material}}\n颜色  {{product.color}}\n尺寸  {{product.length}} × {{product.width}} × {{product.height}}\n重量  {{product.weight}}", fontSize: 32, fontWeight: "normal", align: "left", lineHeight: 2},
+    {id: "panel", type: "SHAPE", x: 70, y: 110, width: 520, height: 1380, rotation: 0, opacity: 1, visible: true, locked: false, zIndex: 0, fill: "#ffffff", stroke: "#dce1dc", strokeWidth: 2, cornerRadius: 24},
+    {...productLayer, x: 610, y: 180, width: 930, height: 1240},
+    {...titleLayer, id: "heading", x: 125, y: 205, width: 410, height: 60, text: "PRODUCT PARAMETERS", fontSize: 27, align: "left", fill: "#a26332"},
+    {...titleLayer, id: "name", x: 125, y: 295, width: 410, height: 145, fontSize: 44, align: "left"},
+    {id: "header-rule", type: "LINE", x: 125, y: 485, width: 410, height: 0, rotation: 0, opacity: 1, visible: true, locked: false, zIndex: 2, points: [0, 0, 410, 0], stroke: "#dce1dc", strokeWidth: 2},
+    {...titleLayer, id: "material-label", x: 125, y: 560, width: 410, height: 35, text: "MATERIAL", fontSize: 21, align: "left", fill: "#7a8492"},
+    {...titleLayer, id: "material", x: 125, y: 610, width: 410, height: 55, text: "{{product.material}}", fontSize: 34, align: "left", fill: "#273247"},
+    {id: "row-1-rule", type: "LINE", x: 125, y: 710, width: 410, height: 0, rotation: 0, opacity: 1, visible: true, locked: false, zIndex: 2, points: [0, 0, 410, 0], stroke: "#e5e8e4", strokeWidth: 2},
+    {...titleLayer, id: "color-label", x: 125, y: 775, width: 175, height: 35, text: "COLOR", fontSize: 21, align: "left", fill: "#7a8492"},
+    {...titleLayer, id: "color", x: 125, y: 825, width: 175, height: 55, text: "{{product.color}}", fontSize: 36, align: "left", fill: "#273247"},
+    {...titleLayer, id: "size-label", x: 335, y: 775, width: 200, height: 35, text: "SIZE", fontSize: 21, align: "left", fill: "#7a8492"},
+    {...titleLayer, id: "size", x: 335, y: 827, width: 200, height: 80, text: "{{product.length}} ×\n{{product.width}}", fontSize: 30, align: "left", fill: "#273247"},
+    {id: "row-2-rule", type: "LINE", x: 125, y: 940, width: 410, height: 0, rotation: 0, opacity: 1, visible: true, locked: false, zIndex: 2, points: [0, 0, 410, 0], stroke: "#e5e8e4", strokeWidth: 2},
+    {...titleLayer, id: "sku-label", x: 125, y: 1005, width: 410, height: 35, text: "SKU", fontSize: 21, align: "left", fill: "#7a8492"},
+    {...titleLayer, id: "sku", x: 125, y: 1055, width: 410, height: 90, text: "{{sku.code}}", fontSize: 30, align: "left", fill: "#273247"},
   ]),
   demoTemplate("template-package", "PACKAGE_01", "商品与包装展示", "PACKAGE", [
     {...productLayer, width: 720, x: 90}, {...productLayer, id: "package", x: 790, width: 720, assetSource: "{{asset.package}}"}, titleLayer,
@@ -280,8 +304,8 @@ export const demoProducts: Product[] = [
     weight_unit: "kg",
     selling_points: ["双电压", "折叠收纳", "防干烧"],
     skus: [
-      {id: "demo-sku", code: "KETTLE-SAGE-EU", attributes: {插头: "EU", 容量: "600ml"}},
-      {id: "demo-sku-us", code: "KETTLE-SAGE-US", attributes: {插头: "US", 容量: "600ml"}},
+      {id: "demo-sku", code: "KETTLE-SAGE-EU", attributes: {插头: "EU", 容量: "600ml", selling_point_description_1: "商品资料提供的简短说明", selling_point_description_2: "商品资料提供的简短说明", selling_point_description_3: "商品资料提供的简短说明"}},
+      {id: "demo-sku-us", code: "KETTLE-SAGE-US", attributes: {插头: "US", 容量: "600ml", selling_point_description_1: "商品资料提供的简短说明", selling_point_description_2: "商品资料提供的简短说明", selling_point_description_3: "商品资料提供的简短说明"}},
     ],
   },
   {

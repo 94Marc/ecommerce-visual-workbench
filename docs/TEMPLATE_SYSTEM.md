@@ -42,6 +42,8 @@ Phase 5 does not visually measure an object. Missing measurements stay empty rat
 
 The renderer also records data provenance. If a bound field is sourced from `DEMO_TEST_DATA`, `PLACEHOLDER`, `UNKNOWN`, or `MISSING_SOURCE`, the output version stores `contains_demo_data=true` and the exact binding paths in `demo_data_fields`. The same provenance is preserved in the render snapshot and generation output metadata.
 
+`SELLING_POINT_01` uses three explicit title bindings and three SKU description bindings (`sku.selling_point_description_1` through `_3`). Supporting copy must be supplied by the merchant or test fixture; the template never expands a selling point. `PARAMETER_01` binds only Material, Color, Size, and SKU in its production schema. A visible `DEMO_TEST_DATA` badge may be added to a smoke-only TemplateVersion, but the production template schema must not contain that literal.
+
 ## Asset selection and truthfulness
 
 Production template selection only accepts non-deleted `APPROVED` AssetVersions belonging to the selected Product and having `contains_demo_data=false`. Explicit production bindings that contain non-production data fail. Automatic preference is:
@@ -79,3 +81,5 @@ Success creates a derived Asset or appends to the Asset assigned to a slot. Ever
 - `DETAIL_CLOSEUP_01`
 
 They are restrained, platform-neutral starting points rather than marketing-heavy designs.
+
+The detail layouts keep product images in `contain` mode and use only deterministic positioning. Refinements create a new TemplateVersion; earlier layouts and rendered AssetVersions remain immutable.

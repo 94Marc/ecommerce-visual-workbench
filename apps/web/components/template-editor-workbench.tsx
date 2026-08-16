@@ -63,6 +63,12 @@ export function TemplateEditorWorkbench({template, products, assets, demo}: {
 
   const previewData = useMemo<TemplatePreviewData>(() => {
     const dimensions = product?.dimensions ?? {};
+    const selectedSku = product?.skus.find((sku) => sku.id === skuId);
+    const skuAttributes = Object.fromEntries(
+      Object.entries(selectedSku?.attributes ?? {}).filter(([, value]) =>
+        value === null || ["string", "number"].includes(typeof value),
+      ),
+    ) as Record<string, string | number | null>;
     const withUnit = (key: string) => dimensions[key] == null ? "" : `${dimensions[key]} ${dimensions.unit ?? "cm"}`;
     const approvedUrl = (types: string[]) => {
       const asset = assets.find((item) => item.product_id === product?.id && types.includes(item.asset_type) && item.versions.some((itemVersion) => itemVersion.status === "APPROVED"));
@@ -77,7 +83,7 @@ export function TemplateEditorWorkbench({template, products, assets, demo}: {
         length: withUnit("length"), width: withUnit("width"), height: withUnit("height"),
         weight: product?.weight_value == null ? "" : `${product.weight_value} ${product.weight_unit ?? ""}`,
       },
-      sku: {code: product?.skus.find((sku) => sku.id === skuId)?.code ?? ""},
+      sku: {code: selectedSku?.code ?? "", ...skuAttributes},
       selling_point_1: product?.selling_points[0] ?? "",
       selling_point_2: product?.selling_points[1] ?? "",
       selling_point_3: product?.selling_points[2] ?? "",

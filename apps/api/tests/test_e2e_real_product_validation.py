@@ -196,6 +196,9 @@ def test_real_cleaning_cloth_end_to_end_validation(client, session):
             "attributes": {
                 "chinese_note": "灰色清洁布",
                 "declared_size": "30 cm × 30 cm",
+                "selling_point_description_1": "Supplied detail text",
+                "selling_point_description_2": "Supplied detail text",
+                "selling_point_description_3": "Supplied detail text",
             },
         },
     )

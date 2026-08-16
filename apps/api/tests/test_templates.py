@@ -324,14 +324,27 @@ def test_detail_templates_record_content_kind_and_demo_data_fields(session):
         "data_source": "DEMO_TEST_DATA",
     }
     product.selling_points = ["Soft texture", "Reusable", "Multi-purpose cleaning"]
-    sku.attributes = {"data_source": "DEMO_TEST_DATA"}
+    sku.attributes = {
+        "data_source": "DEMO_TEST_DATA",
+        "selling_point_description_1": "Demo layout copy only",
+        "selling_point_description_2": "Demo layout copy only",
+        "selling_point_description_3": "Demo layout copy only",
+    }
     session.commit()
     templates = {item.code: item for item in TemplateService(session).list()}
 
     expectations = {
         "SELLING_POINT_01": (
             ContentKind.SELLING_POINT,
-            {"product.name", "selling_point_1", "selling_point_2", "selling_point_3"},
+            {
+                "product.name",
+                "selling_point_1",
+                "selling_point_2",
+                "selling_point_3",
+                "sku.selling_point_description_1",
+                "sku.selling_point_description_2",
+                "sku.selling_point_description_3",
+            },
         ),
         "PARAMETER_01": (
             ContentKind.PARAMETER,
@@ -341,8 +354,6 @@ def test_detail_templates_record_content_kind_and_demo_data_fields(session):
                 "product.color",
                 "product.length",
                 "product.width",
-                "product.height",
-                "product.weight",
                 "sku.code",
             },
         ),
@@ -366,3 +377,35 @@ def test_detail_templates_record_content_kind_and_demo_data_fields(session):
         assert record.product_data_snapshot["contains_demo_data"] is True
         assert job.output_metadata["content_kind"] == content_kind.value
         assert job.output_metadata["contains_demo_data"] is True
+
+
+def test_content_demo_templates_use_optimized_layout_without_embedded_demo_copy(session):
+    templates = {item.code: item for item in TemplateService(session).list()}
+    selling = templates["SELLING_POINT_01"].latest_version
+    parameter = templates["PARAMETER_01"].latest_version
+    assert selling is not None and parameter is not None
+
+    selling_layers = {layer["id"]: layer for layer in selling.schema_json["layers"]}
+    product_width_ratio = selling_layers["product"]["width"] / selling.canvas_width
+    assert 0.48 <= product_width_ratio <= 0.55
+    assert [selling_layers[f"number-{index}"]["text"] for index in range(1, 4)] == [
+        "01",
+        "02",
+        "03",
+    ]
+    assert [
+        selling_layers[f"point-{index}-title"]["text"] for index in range(1, 4)
+    ] == [f"{{{{selling_point_{index}}}}}" for index in range(1, 4)]
+    assert [
+        selling_layers[f"point-{index}-description"]["text"]
+        for index in range(1, 4)
+    ] == [f"{{{{sku.selling_point_description_{index}}}}}" for index in range(1, 4)]
+
+    parameter_layers = {layer["id"]: layer for layer in parameter.schema_json["layers"]}
+    assert parameter_layers["panel"]["width"] < 650
+    assert parameter_layers["product"]["width"] > 700
+    assert parameter_layers["material"]["text"] == "{{product.material}}"
+    assert parameter_layers["color"]["text"] == "{{product.color}}"
+    assert parameter_layers["size"]["text"] == "{{product.length}} ×\n{{product.width}}"
+    assert parameter_layers["sku"]["text"] == "{{sku.code}}"
+    assert "DEMO_TEST_DATA" not in str(parameter.schema_json)
