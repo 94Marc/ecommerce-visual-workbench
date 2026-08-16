@@ -171,3 +171,22 @@ Asset ID、AssetVersion ID、AssetType、VisualPlan、AssetSlot、模板/Provide
 
 在真实 Provider 安装并成功运行、补齐平台规则、提供 SKU 范围清晰的商品图和真实包装素材，
 并完成人工 Fidelity Checklist 前，本系统不应被判定为完整真实生产可用。
+
+## Phase 7.6：Scene Placement Validator（2026-08-16）
+
+`product_scene_v2` 保留“AI 仅生成环境，真实 CUTOUT 进行确定性合成”的架构。验证器使用
+normalized anchor polygon 约束商品投影，记录承托面覆盖率、外溢率、画面面积占比、透视矩阵、
+表面角度和 Alpha 派生接触阴影参数。它不修改商品 RGB，也不使用视觉模型伪装物理测量。
+
+| 候选 | Anchor | inside ratio | overflow ratio | area ratio | 自动验证 | 人工结论 |
+| --- | --- | ---: | ---: | ---: | --- | --- |
+| A / 右侧台面 | `COUNTERTOP_RIGHT_EDGE` | 0.146527 | 0.853473 | 0.013720 | `PLACEMENT_INVALID`, `PLACEMENT_OVERFLOW` | REJECTED |
+| B / 中间主台面 | `COUNTERTOP_MAIN` | 1.000000 | 0.000000 | 0.012546 | VALID；`PLACEMENT_SCALE_WARNING` | APPROVED_FOR_SMOKE_TEST |
+
+面积范围 `0.05–0.18` 仅为 countertop smoke-test 视觉建议。B 的面积警告不等于真实物理尺寸
+失败；测试尺寸来自 `DEMO_TEST_DATA`，因此 B 不得升级为生产级 APPROVED。A 的自动拦截来自
+承托面覆盖不足；人工审核另记录 `PRODUCT_PLACEMENT_UNREALISTIC`、
+`PERSPECTIVE_UNREALISTIC` 和 `SHADOW_UNREALISTIC`。
+
+结论：**ARCHITECTURE_PASS** — “AI generates environment; deterministic pipeline preserves and
+places real product pixels.” 本轮没有生成新 AI 背景，也没有执行 USAGE。
